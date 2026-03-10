@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SyncWatch</title>
+  <link rel="stylesheet" href="popup.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="url(#grad)" stroke-width="2"/>
+          <path d="M10 8L16 12L10 16V8Z" fill="url(#grad)"/>
+          <defs>
+            <linearGradient id="grad" x1="2" y1="2" x2="22" y2="22">
+              <stop stop-color="#A78BFA"/>
+              <stop offset="1" stop-color="#6366F1"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <span class="logo-text">SyncWatch</span>
+      </div>
+      <div class="header-right">
+        <select id="langSelect" class="lang-select" title="Language"></select>
+        <div class="status-dot" id="statusDot" title="Disconnected"></div>
+      </div>
+    </div>
+
+    <!-- Presence Badge -->
+    <div class="presence-bar" id="presenceBar" style="display: none;">
+      <span class="presence-dot"></span>
+      <span id="presenceText"></span>
+    </div>
+
+    <!-- Not Connected View -->
+    <div id="viewDisconnected" class="view">
+      <div class="hero">
+        <p class="hero-text" data-i18n="watchTogether">Watch together, anywhere.</p>
+        <p class="hero-sub" data-i18n="heroSub">Create a room or join with a code to sync your media playback.</p>
+      </div>
+
+      <button class="btn btn-primary" id="btnCreate">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span data-i18n="createRoom">Create Room</span>
+      </button>
+
+      <div class="divider">
+        <span data-i18n="or">or</span>
+      </div>
+
+      <div class="join-form">
+        <input type="text" id="inputRoomId" data-i18n-placeholder="enterCode" placeholder="Enter room code" maxlength="6" autocomplete="off" spellcheck="false">
+        <button class="btn btn-secondary" id="btnJoin" data-i18n="join">Join</button>
+      </div>
+    </div>
+
+    <!-- Waiting View -->
+    <div id="viewWaiting" class="view hidden">
+      <div class="room-card">
+        <p class="room-label" data-i18n="roomCode">Room Code</p>
+        <div class="room-code-container">
+          <span class="room-code" id="roomCode">------</span>
+          <button class="btn-icon" id="btnCopy" title="Copy code">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="5" y="5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M3 11V3.5C3 3.22386 3.22386 3 3.5 3H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+        <p class="room-status">
+          <span class="pulse"></span>
+          <span data-i18n="waitingPeer">Waiting for peer...</span>
+        </p>
+      </div>
+      <button class="btn btn-danger" id="btnLeaveWaiting" data-i18n="leaveRoom">Leave Room</button>
+    </div>
+
+    <!-- Synced View -->
+    <div id="viewSynced" class="view hidden">
+      <div class="sync-card">
+        <div class="sync-header">
+          <div class="sync-indicator">
+            <span class="sync-dot"></span>
+            <span data-i18n="synced">Synced</span>
+          </div>
+          <span class="room-badge" id="syncRoomId">------</span>
+        </div>
+
+        <!-- URL Status -->
+        <div class="url-status" id="urlStatus" style="display: none;">
+          <span id="urlStatusIcon"></span>
+          <span id="urlStatusText"></span>
+        </div>
+
+        <!-- Go to peer's page -->
+        <button class="btn btn-goto" id="btnGoToPage" style="display: none;" data-i18n="goToPage">
+          → Go to peer's page
+        </button>
+
+        <div class="media-info" id="mediaInfo">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M8 8L13 10.5L8 13V8Z" fill="currentColor"/>
+          </svg>
+          <span id="mediaLabel" data-i18n="detectingMedia">Detecting media...</span>
+        </div>
+      </div>
+
+      <button class="btn btn-danger" id="btnDisconnect" data-i18n="disconnect">Disconnect</button>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast hidden" id="toast">
+      <span id="toastMessage"></span>
+    </div>
+  </div>
+
+  <script src="../locales.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
