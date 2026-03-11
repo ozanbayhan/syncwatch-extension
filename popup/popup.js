@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const viewDisconnected = document.getElementById('viewDisconnected');
     const viewWaiting = document.getElementById('viewWaiting');
     const viewSynced = document.getElementById('viewSynced');
+    const viewBrowse = document.getElementById('viewBrowse');
     const toast = document.getElementById('toast');
     const toastMessage = document.getElementById('toastMessage');
 
@@ -26,6 +27,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const urlStatusText = document.getElementById('urlStatusText');
     const btnGoToPage = document.getElementById('btnGoToPage');
     const langSelect = document.getElementById('langSelect');
+
+    // Advanced options elements
+    const btnAdvanced = document.getElementById('btnAdvanced');
+    const roomOptions = document.getElementById('roomOptions');
+    const publicRoomToggle = document.getElementById('publicRoomToggle');
+    const roomName = document.getElementById('roomName');
+    const roomDescription = document.getElementById('roomDescription');
+
+    // Browse view elements
+    const btnBrowse = document.getElementById('btnBrowse');
+    const btnBackFromBrowse = document.getElementById('btnBackFromBrowse');
+    const filterOccupancy = document.getElementById('filterOccupancy');
+    const roomsList = document.getElementById('roomsList');
 
     // ─── i18n ─────────────────────────────────────────────────
     let currentLang = 'en';
@@ -84,6 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
         viewDisconnected.classList.add('hidden');
         viewWaiting.classList.add('hidden');
         viewSynced.classList.add('hidden');
+        viewBrowse.classList.add('hidden');
         view.classList.remove('hidden');
     }
 
@@ -165,9 +180,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ─── Event Handlers ───────────────────────────────────────
 
+    // Advanced options toggle
+    btnAdvanced.addEventListener('click', () => {
+        const isVisible = roomOptions.style.display !== 'none';
+        roomOptions.style.display = isVisible ? 'none' : 'block';
+        btnAdvanced.textContent = _(isVisible ? 'advancedOptions' : 'hideOptions');
+    });
+
+    // Show/hide name/description when public is toggled
+    publicRoomToggle.addEventListener('change', () => {
+        const isPublic = publicRoomToggle.checked;
+        roomName.style.display = isPublic ? 'block' : 'none';
+        roomDescription.style.display = isPublic ? 'block' : 'none';
+    });
+
     btnCreate.addEventListener('click', () => {
         btnCreate.disabled = true;
-        chrome.runtime.sendMessage({ type: 'create_room' }, () => {
+
+        const isPublic = publicRoomToggle.checked;
+        const name = roomName.value.trim();
+        const desc = roomDescription.value.trim();
+
+        chrome.runtime.sendMessage({
+            type: 'create_room',
+            isPublic: isPublic,
+            name: name || null,
+            description: desc || null
+        }, () => {
             btnCreate.disabled = false;
         });
     });
@@ -210,6 +249,82 @@ document.addEventListener('DOMContentLoaded', () => {
     btnGoToPage.addEventListener('click', () => {
         chrome.runtime.sendMessage({ type: 'navigate_to_peer' });
     });
+
+    // Browse view handlers
+    btnBrowse.addEventListener('click', () => {
+        showView(viewBrowse);
+        loadPublicRooms();
+    });
+
+    btnBackFromBrowse.addEventListener('click', () => {
+        showView(viewDisconnected);
+    });
+
+    filterOccupancy.addEventListener('change', loadPublicRooms);
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    async function loadPublicRooms() {
+        const occupancyFilter = filterOccupancy.value;
+
+        chrome.runtime.sendMessage({ type: 'get_public_rooms' }, (response) => {
+            if (!response || !response.rooms) {
+                roomsList.innerHTML = `<p class="no-rooms" data-i18n="noRoomsFound">No public rooms found</p>`;
+                return;
+            }
+
+            let rooms = response.rooms;
+
+            // Client-side occupancy filter
+            if (occupancyFilter) {
+                rooms = rooms.filter(r => {
+                    const ratio = r.userCount / r.maxPeers;
+                    if (occupancyFilter === 'empty') return r.userCount === 0;
+                    if (occupancyFilter === 'half') return ratio > 0 && ratio <= 0.6;
+                    if (occupancyFilter === 'almost') return ratio > 0.6;
+                    return true;
+                });
+            }
+
+            if (rooms.length === 0) {
+                roomsList.innerHTML = `<p class="no-rooms">No rooms match your filter</p>`;
+                return;
+            }
+
+            roomsList.innerHTML = rooms.map(room => `
+                <div class="room-item">
+                    <div class="room-header">
+                        <span class="room-name">${escapeHtml(room.name)}</span>
+                        <span class="room-badge">${room.userCount}/${room.maxPeers}</span>
+                    </div>
+                    <div class="room-meta">
+                        <span class="room-site">🌐 ${escapeHtml(room.currentSite)}</span>
+                        <span class="room-time">⏱ ${room.timeAgo}</span>
+                    </div>
+                    ${room.description ? `<p class="room-desc">${escapeHtml(room.description)}</p>` : ''}
+                    <button class="btn-join-room" data-room-id="${room.roomId}">${_('joinRoom')}</button>
+                </div>
+            `).join('');
+
+            // Attach click handlers
+            document.querySelectorAll('.btn-join-room').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const roomId = btn.getAttribute('data-room-id');
+                    chrome.runtime.sendMessage({ type: 'join_public_room', roomId }, (res) => {
+                        if (res && !res.error) {
+                            // Will be handled by state update
+                        } else {
+                            showToast(res.error || 'Failed to join', 'error');
+                        }
+                    });
+                });
+            });
+        });
+    }
 
     // ─── State Listener ───────────────────────────────────────
 

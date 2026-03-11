@@ -453,3 +453,233 @@ body {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Room Options (Advanced) */
+.btn-link {
+  background: none;
+  border: none;
+  color: #a5b4fc;
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 4px 0;
+  transition: color 0.2s;
+}
+
+.btn-link:hover {
+  color: #c7d2fe;
+}
+
+.room-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  animation: fadeIn 0.2s ease;
+}
+
+.option-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #e4e4eb;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.option-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #6366f1;
+}
+
+.room-options input[type="text"],
+.room-options textarea {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #e4e4eb;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+  resize: none;
+}
+
+.room-options input:focus,
+.room-options textarea:focus {
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+.room-options textarea {
+  min-height: 60px;
+}
+
+/* Browse View */
+.browse-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.browse-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e4e4eb;
+  margin: 0;
+}
+
+.filter-select {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #e4e4eb;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.filter-select:hover,
+.filter-select:focus {
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+.filter-select option {
+  background: #1a1a2e;
+  color: #e4e4eb;
+}
+
+.rooms-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.rooms-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.rooms-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 2px;
+}
+
+.rooms-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.rooms-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.room-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.room-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(99, 102, 241, 0.2);
+}
+
+.room-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.room-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e4e4eb;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-badge {
+  font-size: 10px;
+  color: #a1a1aa;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 3px 8px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.room-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 10px;
+  color: #71717a;
+}
+
+.room-site,
+.room-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.room-desc {
+  font-size: 11px;
+  color: #a1a1aa;
+  line-height: 1.4;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.btn-join-room {
+  background: linear-gradient(135deg, #7c3aed, #6366f1);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.btn-join-room:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btn-join-room:active {
+  transform: translateY(0);
+}
+
+.no-rooms {
+  text-align: center;
+  color: #71717a;
+  font-size: 12px;
+  padding: 24px 12px;
+}

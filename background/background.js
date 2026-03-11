@@ -29,9 +29,19 @@ const PRESENCE_TTL_MS = 90000;
 const ROOM_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // ─── Init ─────────────────────────────────────────────────
-chrome.storage.local.get(['peerId'], (result) => {
+chrome.storage.local.get(['peerId', 'username'], (result) => {
     if (!result.peerId) {
         chrome.storage.local.set({ peerId: crypto.randomUUID().slice(0, 8) });
+    }
+    // Generate anonymous username if not exists
+    if (!result.username) {
+        const adjectives = ['Swift', 'Clever', 'Brave', 'Silent', 'Bright', 'Calm', 'Bold', 'Wise', 'Quick', 'Noble'];
+        const animals = ['Fox', 'Panda', 'Tiger', 'Eagle', 'Wolf', 'Bear', 'Hawk', 'Lion', 'Otter', 'Raven'];
+        const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+        const animal = animals[Math.floor(Math.random() * animals.length)];
+        const num = Math.floor(Math.random() * 1000);
+        const username = `${adj}_${animal}${num}`;
+        chrome.storage.local.set({ username });
     }
 });
 
@@ -106,6 +116,15 @@ function generateRoomId() {
     return id;
 }
 
+function generateAnonymousUsername() {
+    const adjectives = ['Swift', 'Clever', 'Brave', 'Silent', 'Bright', 'Calm', 'Bold', 'Wise', 'Quick', 'Noble'];
+    const animals = ['Fox', 'Panda', 'Tiger', 'Eagle', 'Wolf', 'Bear', 'Hawk', 'Lion', 'Otter', 'Raven'];
+    const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+    const animal = animals[Math.floor(Math.random() * animals.length)];
+    const num = Math.floor(Math.random() * 1000);
+    return `${adj}_${animal}${num}`;
+}
+
 async function getActiveTabUrl() {
     try {
         const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
@@ -117,24 +136,80 @@ async function getActiveTabUrl() {
 
 // ─── Room Actions ─────────────────────────────────────────
 
-async function createRoom() {
-    const { peerId } = await chrome.storage.local.get('peerId');
+async function createRoom(isPublic = false, roomName = null, description = null) {
+    const { peerId, username } = await chrome.storage.local.get(['peerId', 'username']);
+
+    // Ensure username exists
+    let finalUsername = username;
+    if (!finalUsername) {
+        finalUsername = generateAnonymousUsername();
+        await chrome.storage.local.set({ username: finalUsername });
+    }
+
     const newRoomId = generateRoomId();
     const currentUrl = await getActiveTabUrl();
     const norm = currentUrl ? normalizeUrl(currentUrl) : null;
 
-    const res = await firebase('PUT', `rooms/${newRoomId}`, {
+    // Extract site domain
+    let site = 'unknown';
+    if (norm) {
+        try {
+            const u = new URL(norm);
+            site = u.hostname.replace('www.', '');
+        } catch (e) {
+            site = 'unknown';
+        }
+    }
+
+    // Create room data with extended schema
+    const roomData = {
         createdAt: Date.now(),
         host: peerId,
-        peers: { [peerId]: true },
+        isPublic: isPublic,
+        maxPeers: isPublic ? 5 : 2,
+        peers: {
+            [peerId]: {
+                joined: Date.now(),
+                username: finalUsername
+            }
+        },
         urls: norm ? { [peerId]: norm } : {},
-        lastEvent: null
-    });
+        lastEvent: null,
+        lastActivity: Date.now()
+    };
+
+    // Add public room metadata if public
+    if (isPublic && roomName) {
+        roomData.name = String(roomName).slice(0, 50);
+        roomData.description = String(description || '').slice(0, 200);
+        roomData.currentSite = site;
+    }
+
+    const res = await firebase('PUT', `rooms/${newRoomId}`, roomData);
 
     if (!res) {
         broadcastState({ error: 'Firebase connection failed.' });
         return;
     }
+
+    // Add to public rooms listing if public
+    if (isPublic) {
+        await firebase('PUT', `publicRooms/${newRoomId}`, {
+            name: roomData.name || 'Unnamed Room',
+            description: roomData.description || '',
+            createdAt: roomData.createdAt,
+            userCount: 1,
+            maxPeers: 5,
+            currentSite: site,
+            lastActivity: Date.now()
+        });
+    }
+
+    // Store username in global mapping
+    await firebase('PUT', `usernames/${peerId}`, {
+        username: finalUsername,
+        lastSeen: Date.now()
+    });
 
     await chrome.storage.local.set({
         roomId: newRoomId,
@@ -153,37 +228,72 @@ async function joinRoom(targetRoomId) {
     const code = sanitizeRoomId(targetRoomId);
     if (!code || code.length < 4) {
         broadcastState({ error: 'Invalid room code.' });
-        return false;
+        return { error: 'Invalid room code.' };
     }
 
     const room = await firebase('GET', `rooms/${code}`);
     if (!room) {
         broadcastState({ error: 'Room not found.' });
-        return false;
+        return { error: 'Room not found.' };
     }
 
     // Stale room check
     if (room.createdAt && (Date.now() - room.createdAt) > ROOM_TTL_MS) {
         await firebase('DELETE', `rooms/${code}`);
         broadcastState({ error: 'Room expired.' });
-        return false;
+        return { error: 'Room expired.' };
     }
 
+    // Check capacity against maxPeers
+    const maxPeers = room.maxPeers || 2;
     const peerCount = room.peers ? Object.keys(room.peers).length : 0;
-    if (peerCount >= 2) {
-        broadcastState({ error: 'Room is full (max 2).' });
-        return false;
+    if (peerCount >= maxPeers) {
+        broadcastState({ error: `Room is full (${maxPeers}/${maxPeers}).` });
+        return { error: `Room is full (${maxPeers}/${maxPeers}).` };
     }
 
-    const { peerId } = await chrome.storage.local.get('peerId');
+    const { peerId, username } = await chrome.storage.local.get(['peerId', 'username']);
+
+    // Ensure username exists
+    let finalUsername = username;
+    if (!finalUsername) {
+        finalUsername = generateAnonymousUsername();
+        await chrome.storage.local.set({ username: finalUsername });
+    }
+
     const currentUrl = await getActiveTabUrl();
     const norm = currentUrl ? normalizeUrl(currentUrl) : null;
 
-    await firebase('PATCH', `rooms/${code}/peers`, { [peerId]: true });
-    await firebase('PATCH', `rooms/${code}`, { peerJoined: Date.now() });
+    // Add user with username to peers
+    await firebase('PATCH', `rooms/${code}/peers`, {
+        [peerId]: {
+            joined: Date.now(),
+            username: finalUsername
+        }
+    });
+
+    await firebase('PATCH', `rooms/${code}`, {
+        peerJoined: Date.now(),
+        lastActivity: Date.now()
+    });
+
     if (norm) {
         await firebase('PATCH', `rooms/${code}/urls`, { [peerId]: norm });
     }
+
+    // Update publicRooms userCount if public
+    if (room.isPublic) {
+        await firebase('PATCH', `publicRooms/${code}`, {
+            userCount: peerCount + 1,
+            lastActivity: Date.now()
+        });
+    }
+
+    // Store username in global mapping
+    await firebase('PUT', `usernames/${peerId}`, {
+        username: finalUsername,
+        lastSeen: Date.now()
+    });
 
     let peerUrl = null;
     let urlMatch = null;
@@ -197,7 +307,7 @@ async function joinRoom(targetRoomId) {
 
     await chrome.storage.local.set({
         roomId: code,
-        peerConnected: true,
+        peerConnected: peerCount >= 1, // Connected if there's at least 1 other peer
         lastEventTimestamp: 0,
         isHost: false,
         myUrl: norm,
@@ -206,20 +316,43 @@ async function joinRoom(targetRoomId) {
     });
 
     broadcastState();
-    return true;
+    return { ok: true };
 }
 
 async function leaveRoom() {
     const { roomId, peerId } = await chrome.storage.local.get(['roomId', 'peerId']);
 
     if (roomId) {
+        // Get room data before deletion
+        const room = await firebase('GET', `rooms/${roomId}`);
+
         await firebase('DELETE', `rooms/${roomId}/peers/${peerId}`);
         await firebase('DELETE', `rooms/${roomId}/urls/${peerId}`);
+
         const peers = await firebase('GET', `rooms/${roomId}/peers`);
-        if (!peers || Object.keys(peers).length === 0) {
+        const remainingCount = peers ? Object.keys(peers).length : 0;
+
+        if (remainingCount === 0) {
+            // Delete room entirely
             await firebase('DELETE', `rooms/${roomId}`);
+
+            // Delete from publicRooms if public
+            if (room && room.isPublic) {
+                await firebase('DELETE', `publicRooms/${roomId}`);
+            }
         } else {
-            await firebase('PATCH', `rooms/${roomId}`, { peerLeft: Date.now() });
+            await firebase('PATCH', `rooms/${roomId}`, {
+                peerLeft: Date.now(),
+                lastActivity: Date.now()
+            });
+
+            // Update publicRooms userCount if public
+            if (room && room.isPublic) {
+                await firebase('PATCH', `publicRooms/${roomId}`, {
+                    userCount: remainingCount,
+                    lastActivity: Date.now()
+                });
+            }
         }
     }
 
@@ -259,6 +392,99 @@ async function sendSyncEvent(action, currentTime, playbackRate) {
     });
 
     await chrome.storage.local.set({ lastEventTimestamp: ts });
+}
+
+// ─── Room Discovery ───────────────────────────────────────
+
+function formatTimeAgo(ms) {
+    const minutes = Math.floor(ms / 60000);
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ago`;
+}
+
+async function getPublicRooms() {
+    const data = await firebase('GET', 'publicRooms');
+    if (!data) return [];
+
+    const now = Date.now();
+    const rooms = [];
+
+    for (const [roomId, room] of Object.entries(data)) {
+        // Filter expired rooms (>24 hours)
+        if (room.createdAt && (now - room.createdAt) > ROOM_TTL_MS) {
+            firebase('DELETE', `publicRooms/${roomId}`).catch(() => {});
+            continue;
+        }
+
+        // Verify room still exists
+        const roomData = await firebase('GET', `rooms/${roomId}`);
+        if (!roomData) {
+            firebase('DELETE', `publicRooms/${roomId}`).catch(() => {});
+            continue;
+        }
+
+        const peerCount = roomData.peers ? Object.keys(roomData.peers).length : 0;
+        const maxPeers = roomData.maxPeers || 5;
+
+        // Skip full rooms
+        if (peerCount >= maxPeers) continue;
+
+        rooms.push({
+            roomId,
+            name: room.name || 'Unnamed Room',
+            description: room.description || '',
+            userCount: peerCount,
+            maxPeers: maxPeers,
+            currentSite: room.currentSite || 'unknown',
+            createdAt: room.createdAt,
+            timeAgo: formatTimeAgo(now - room.createdAt)
+        });
+    }
+
+    // Sort by most recent
+    return rooms.sort((a, b) => b.createdAt - a.createdAt);
+}
+
+// ─── Chat System ──────────────────────────────────────────
+
+async function sendChatMessage(text) {
+    const { roomId, peerId, username } = await chrome.storage.local.get(['roomId', 'peerId', 'username']);
+    if (!roomId || !text) return false;
+
+    const sanitized = String(text).slice(0, 500);
+    const messageId = `${Date.now()}_${peerId.slice(0, 4)}`;
+
+    await firebase('PUT', `chat/${roomId}/${messageId}`, {
+        from: peerId,
+        username: username || 'Anonymous',
+        text: sanitized,
+        timestamp: Date.now()
+    });
+
+    // Update room activity
+    await firebase('PATCH', `rooms/${roomId}`, { lastActivity: Date.now() });
+
+    return true;
+}
+
+async function getChatMessages(sinceTimestamp = 0) {
+    const { roomId } = await chrome.storage.local.get('roomId');
+    if (!roomId) return [];
+
+    const data = await firebase('GET', `chat/${roomId}`);
+    if (!data) return [];
+
+    const messages = [];
+    for (const [msgId, msg] of Object.entries(data)) {
+        if (msg.timestamp > sinceTimestamp) {
+            messages.push({ ...msg, id: msgId });
+        }
+    }
+
+    // Sort by timestamp ascending
+    return messages.sort((a, b) => a.timestamp - b.timestamp);
 }
 
 // ─── Presence System ──────────────────────────────────────
@@ -414,11 +640,39 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
     switch (msg.type) {
         case 'create_room':
-            createRoom().then(() => sendResponse({ ok: true })).catch(() => sendResponse({ ok: false }));
+            createRoom(msg.isPublic, msg.name, msg.description)
+                .then(() => sendResponse({ ok: true }))
+                .catch(() => sendResponse({ ok: false }));
             return true;
 
         case 'join_room':
-            joinRoom(msg.roomId).then(ok => sendResponse({ ok })).catch(() => sendResponse({ ok: false }));
+            joinRoom(msg.roomId)
+                .then(result => sendResponse(result))
+                .catch(() => sendResponse({ error: 'Failed to join' }));
+            return true;
+
+        case 'get_public_rooms':
+            getPublicRooms()
+                .then(rooms => sendResponse({ rooms }))
+                .catch(() => sendResponse({ rooms: [] }));
+            return true;
+
+        case 'join_public_room':
+            joinRoom(msg.roomId)
+                .then(result => sendResponse(result))
+                .catch(() => sendResponse({ error: 'Failed to join' }));
+            return true;
+
+        case 'send_chat':
+            sendChatMessage(msg.text)
+                .then(ok => sendResponse({ ok }))
+                .catch(() => sendResponse({ ok: false }));
+            return true;
+
+        case 'get_chat_messages':
+            getChatMessages(msg.since)
+                .then(messages => sendResponse({ messages }))
+                .catch(() => sendResponse({ messages: [] }));
             return true;
 
         case 'leave_room':

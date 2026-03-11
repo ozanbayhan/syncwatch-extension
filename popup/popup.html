@@ -45,6 +45,33 @@
         <p class="hero-sub" data-i18n="heroSub">Create a room or join with a code to sync your media playback.</p>
       </div>
 
+      <!-- Advanced Options Toggle -->
+      <button class="btn-link" id="btnAdvanced" data-i18n="advancedOptions">Advanced options</button>
+
+      <!-- Room Options (Hidden by default) -->
+      <div class="room-options" id="roomOptions" style="display: none;">
+        <label class="option-toggle">
+          <input type="checkbox" id="publicRoomToggle">
+          <span data-i18n="makePublic">Make room public</span>
+        </label>
+
+        <input
+          type="text"
+          id="roomName"
+          data-i18n-placeholder="roomNamePlaceholder"
+          placeholder="Room name (optional)"
+          maxlength="50"
+          style="display: none;">
+
+        <textarea
+          id="roomDescription"
+          data-i18n-placeholder="roomDescPlaceholder"
+          placeholder="What are you watching? (optional)"
+          maxlength="200"
+          rows="3"
+          style="display: none;"></textarea>
+      </div>
+
       <button class="btn btn-primary" id="btnCreate">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -60,6 +87,32 @@
         <input type="text" id="inputRoomId" data-i18n-placeholder="enterCode" placeholder="Enter room code" maxlength="6" autocomplete="off" spellcheck="false">
         <button class="btn btn-secondary" id="btnJoin" data-i18n="join">Join</button>
       </div>
+
+      <div class="divider">
+        <span data-i18n="or">or</span>
+      </div>
+
+      <button class="btn btn-secondary" id="btnBrowse" data-i18n="browsePublicRooms">Browse Public Rooms</button>
+    </div>
+
+    <!-- Browse Public Rooms View -->
+    <div id="viewBrowse" class="view hidden">
+      <div class="browse-header">
+        <h3 data-i18n="browseRooms">Browse Public Rooms</h3>
+
+        <select id="filterOccupancy" class="filter-select" title="Filter rooms by occupancy">
+          <option value="" data-i18n="allRooms">All rooms</option>
+          <option value="empty" data-i18n="emptyRooms">Empty rooms</option>
+          <option value="half" data-i18n="halfFull">Half full</option>
+          <option value="almost" data-i18n="almostFull">Almost full</option>
+        </select>
+      </div>
+
+      <div id="roomsList" class="rooms-list">
+        <!-- Dynamically populated -->
+      </div>
+
+      <button class="btn btn-secondary" id="btnBackFromBrowse" data-i18n="back">Back</button>
     </div>
 
     <!-- Waiting View -->

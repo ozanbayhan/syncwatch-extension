@@ -24,6 +24,13 @@
     let goToPageBtn = null;
     let overlayVisible = true;
 
+    // Chat elements
+    let chatPanelEl = null;
+    let chatToggleBtn = null;
+    let unreadCount = 0;
+    let lastChatTimestamp = 0;
+    let myPeerId = null;
+
     let lastRemoteState = {
         action: 'paused',
         currentTime: 0,
@@ -57,8 +64,123 @@
     }
 
     // ─── Media Detection ──────────────────────────────────────
-    function findMediaElements() {
+
+    // Strategy 1: Standard HTML5 media
+    function findHTML5Media() {
         return [...document.querySelectorAll('video, audio')];
+    }
+
+    // Strategy 2: Shadow DOM traversal
+    function findShadowMedia() {
+        const results = [];
+        const allElements = document.querySelectorAll('*');
+
+        allElements.forEach(host => {
+            if (host.shadowRoot) {
+                const shadowMedia = host.shadowRoot.querySelectorAll('video, audio');
+                results.push(...shadowMedia);
+            }
+        });
+
+        return results;
+    }
+
+    // Strategy 3: Site-specific selectors
+    function findSiteSpecificPlayers() {
+        const hostname = window.location.hostname;
+
+        if (hostname.includes('youtube.com')) {
+            const player = document.querySelector('.html5-video-player video');
+            if (player) return [player];
+        }
+
+        if (hostname.includes('netflix.com')) {
+            const player = document.querySelector('video');
+            if (player) return [player];
+        }
+
+        if (hostname.includes('twitch.tv')) {
+            const player = document.querySelector('video[data-a-target="video-player"]');
+            if (player) return [player];
+        }
+
+        if (hostname.includes('vimeo.com')) {
+            const player = document.querySelector('.vp-video video, .vp-video-wrapper video');
+            if (player) return [player];
+        }
+
+        if (hostname.includes('disneyplus.com')) {
+            const player = document.querySelector('video');
+            if (player) return [player];
+        }
+
+        if (hostname.includes('amazon.') || hostname.includes('primevideo.com')) {
+            const player = document.querySelector('video.dv-player-fullscreen, video');
+            if (player) return [player];
+        }
+
+        if (hostname.includes('hbomax.com') || hostname.includes('max.com')) {
+            const player = document.querySelector('video');
+            if (player) return [player];
+        }
+
+        if (hostname.includes('dailymotion.com')) {
+            const player = document.querySelector('video');
+            if (player) return [player];
+        }
+
+        return [];
+    }
+
+    // Strategy 4: Custom player frameworks
+    function findCustomPlayerElements() {
+        const knownTags = ['video-js', 'plyr', 'vg-player', 'jwplayer'];
+
+        for (const tag of knownTags) {
+            const elements = document.querySelectorAll(tag);
+            for (const el of elements) {
+                const video = el.querySelector('video') || el.shadowRoot?.querySelector('video');
+                if (video) return [video];
+            }
+        }
+
+        return [];
+    }
+
+    // Master detection with fallback chain
+    function findMediaElements() {
+        let elements = [];
+
+        // Priority 1: Site-specific (most reliable)
+        elements = findSiteSpecificPlayers();
+        if (elements.length > 0) {
+            console.log('[SyncWatch] Detected media via site-specific selector');
+            return elements;
+        }
+
+        // Priority 2: Standard HTML5
+        elements = findHTML5Media();
+        if (elements.length > 0) {
+            console.log('[SyncWatch] Detected HTML5 media');
+            return elements;
+        }
+
+        // Priority 3: Shadow DOM
+        elements = findShadowMedia();
+        if (elements.length > 0) {
+            console.log('[SyncWatch] Detected media in Shadow DOM');
+            return elements;
+        }
+
+        // Priority 4: Custom player frameworks
+        elements = findCustomPlayerElements();
+        if (elements.length > 0) {
+            console.log('[SyncWatch] Detected media in custom player');
+            return elements;
+        }
+
+        console.log('[SyncWatch] No media elements detected');
+        return [];
     }
 
     function selectBestMedia() {
@@ -265,6 +387,11 @@
                         }
                     });
                 }
+
+                // Poll chat messages every 2 seconds
+                if (presencePollCounter % 2 === 0) {
+                    pollChatMessages();
+                }
             } catch (e) { /* extension context invalidated */ }
         }, 1000);
     }
@@ -425,6 +552,7 @@
             <div id="sw-drift" style="font-size:11px;color:#aaa;"></div>
             <button id="sw-sync-btn" style="display:none;background:linear-gradient(135deg,#7c3aed,#6366f1);color:white;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;margin-top:5px;font-size:11px;width:100%;font-weight:600;">⚡ Fix Sync</button>
             <button id="sw-goto-btn" style="display:none;background:rgba(99,102,241,0.15);color:#a5b4fc;border:1px solid rgba(99,102,241,0.2);padding:4px 8px;border-radius:6px;cursor:pointer;margin-top:4px;font-size:10px;width:100%;font-weight:500;">→ Go to peer's page</button>
+            <button id="sw-chat-toggle" style="display:none;margin-top:8px;background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:11px;width:100%;font-weight:500;">💬 <span id="sw-chat-label">Chat</span> <span id="sw-chat-badge"></span></button>
         `;
 
         Object.assign(overlayEl.style, {
@@ -463,6 +591,7 @@
         overlayPresence = document.getElementById('sw-presence');
         syncBtn = document.getElementById('sw-sync-btn');
         goToPageBtn = document.getElementById('sw-goto-btn');
+        chatToggleBtn = document.getElementById('sw-chat-toggle');
 
         // Close button → hides overlay, shows mini toggle
         document.getElementById('sw-close').addEventListener('click', toggleOverlay);
@@ -515,6 +644,202 @@
                 if (header) header.style.cursor = 'grab';
             }
         });
+
+        // Get peerId from storage
+        chrome.storage.local.get(['peerId'], (result) => {
+            myPeerId = result.peerId;
+        });
+
+        // Create chat panel
+        createChatPanel();
+    }
+
+    // ─── Chat Panel ───────────────────────────────────────────
+
+    function createChatPanel() {
+        if (chatPanelEl || !isTopFrame) return;
+
+        chatPanelEl = document.createElement('div');
+        chatPanelEl.id = 'syncwatch-chat';
+        chatPanelEl.innerHTML = `
+            <div class="chat-header" style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:13px;color:#e4e4eb;">
+                <span>💬 Chat</span>
+                <span id="chat-close" style="cursor:pointer;font-size:16px;">&times;</span>
+            </div>
+            <div id="chat-messages" class="chat-messages" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;"></div>
+            <div class="chat-input-container" style="display:flex;gap:8px;padding:12px;border-top:1px solid rgba(255,255,255,0.1);">
+                <input type="text" id="chat-input" placeholder="Type a message..." maxlength="500" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:8px 10px;color:#e4e4eb;font-size:12px;outline:none;">
+                <button id="chat-send" style="background:linear-gradient(135deg,#7c3aed,#6366f1);border:none;border-radius:6px;color:white;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;">Send</button>
+            </div>
+        `;
+
+        Object.assign(chatPanelEl.style, {
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            width: '280px',
+            height: '400px',
+            backgroundColor: 'rgba(15, 15, 23, 0.95)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            borderRadius: '12px',
+            border: '1px solid rgba(255,255,255,0.08)',
+            display: 'none',
+            flexDirection: 'column',
+            zIndex: '2147483645',
+            fontFamily: "'Inter', -apple-system, sans-serif",
+            boxShadow: '0 8px 32px rgba(0,0,0,0.4)'
+        });
+
+        // Inject chat styles
+        const chatStyles = document.createElement('style');
+        chatStyles.textContent = `
+            #syncwatch-chat .chat-message {
+                background: rgba(255,255,255,0.05);
+                padding: 8px 10px;
+                border-radius: 8px;
+                font-size: 12px;
+            }
+            #syncwatch-chat .chat-message-header {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 4px;
+                font-size: 10px;
+            }
+            #syncwatch-chat .chat-username {
+                font-weight: 600;
+                color: #a5b4fc;
+            }
+            #syncwatch-chat .chat-username.me {
+                color: #34d399;
+            }
+            #syncwatch-chat .chat-time {
+                color: #71717a;
+            }
+            #syncwatch-chat .chat-text {
+                color: #e4e4eb;
+                line-height: 1.4;
+                word-wrap: break-word;
+            }
+            #syncwatch-chat #chat-input:focus {
+                border-color: rgba(99,102,241,0.5);
+            }
+            #syncwatch-chat #chat-send:hover {
+                opacity: 0.9;
+            }
+        `;
+        chatPanelEl.appendChild(chatStyles);
+        document.body.appendChild(chatPanelEl);
+
+        // Chat toggle
+        chatToggleBtn.addEventListener('click', () => {
+            const isVisible = chatPanelEl.style.display !== 'none';
+            chatPanelEl.style.display = isVisible ? 'none' : 'flex';
+
+            if (!isVisible) {
+                unreadCount = 0;
+                updateChatBadge();
+                document.getElementById('chat-input').focus();
+            }
+        });
+
+        // Chat close
+        chatPanelEl.querySelector('#chat-close').addEventListener('click', () => {
+            chatPanelEl.style.display = 'none';
+        });
+
+        // Chat send
+        function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (!text || text.length > 500) return;
+
+            try {
+                chrome.runtime.sendMessage({
+                    type: 'send_chat',
+                    text: text
+                }, (response) => {
+                    if (response && response.ok) {
+                        input.value = '';
+                    }
+                });
+            } catch (e) { /* ignore */ }
+        }
+
+        document.getElementById('chat-send').addEventListener('click', sendChatMessage);
+        document.getElementById('chat-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendChatMessage();
+            }
+        });
+    }
+
+    function pollChatMessages() {
+        if (!currentRoomState.peerConnected) return;
+
+        try {
+            chrome.runtime.sendMessage({
+                type: 'get_chat_messages',
+                since: lastChatTimestamp
+            }, (response) => {
+                if (chrome.runtime.lastError || !response) return;
+                if (response.messages) {
+                    response.messages.forEach(msg => {
+                        appendChatMessage(msg);
+                        if (msg.timestamp > lastChatTimestamp) {
+                            lastChatTimestamp = msg.timestamp;
+
+                            // Increment unread if chat is hidden and not from me
+                            if (chatPanelEl.style.display === 'none' && msg.from !== myPeerId) {
+                                unreadCount++;
+                                updateChatBadge();
+                            }
+                        }
+                    });
+                }
+            });
+        } catch (e) { /* ignore */ }
+    }
+
+    function appendChatMessage(msg) {
+        const messagesDiv = document.getElementById('chat-messages');
+        if (!messagesDiv) return;
+
+        const msgEl = document.createElement('div');
+        msgEl.className = 'chat-message';
+
+        const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const isMe = msg.from === myPeerId;
+
+        msgEl.innerHTML = `
+            <div class="chat-message-header">
+                <span class="chat-username ${isMe ? 'me' : ''}">${escapeHtml(msg.username)}</span>
+                <span class="chat-time">${time}</span>
+            </div>
+            <div class="chat-text">${escapeHtml(msg.text)}</div>
+        `;
+
+        messagesDiv.appendChild(msgEl);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function updateChatBadge() {
+        const badge = document.getElementById('sw-chat-badge');
+        if (!badge) return;
+
+        if (unreadCount > 0) {
+            badge.textContent = `(${unreadCount})`;
+            badge.style.color = '#fbbf24';
+        } else {
+            badge.textContent = '';
+        }
     }
 
     // ─── Overlay Update Functions ─────────────────────────────
@@ -541,6 +866,8 @@
             overlayUrlStatus.style.display = 'none';
             syncBtn.style.display = 'none';
             goToPageBtn.style.display = 'none';
+            if (chatToggleBtn) chatToggleBtn.style.display = 'none';
+            if (chatPanelEl) chatPanelEl.style.display = 'none';
             return;
         }
 
@@ -550,10 +877,29 @@
             overlayUrlStatus.style.display = 'none';
             syncBtn.style.display = 'none';
             goToPageBtn.style.display = 'none';
+            if (chatToggleBtn) chatToggleBtn.style.display = 'none';
+            if (chatPanelEl) chatPanelEl.style.display = 'none';
             return;
         }
 
         overlayStatus.innerHTML = `<span style="color:#34d399">${_('synced')}</span> <span style="color:#52525b;font-size:10px">${currentRoomState.roomId}</span>`;
+
+        // Show chat button when connected
+        if (chatToggleBtn) chatToggleBtn.style.display = 'block';
+
+        // Show custom player warning if no media detected
+        const warningEl = document.getElementById('sw-custom-warning');
+        if (!activeMedia) {
+            if (!warningEl) {
+                const warning = document.createElement('div');
+                warning.id = 'sw-custom-warning';
+                warning.style.cssText = 'font-size:10px; color:#fca5a5; background:rgba(239,68,68,0.1); padding:6px 8px; border-radius:4px; margin-top:6px; border:1px solid rgba(239,68,68,0.2);';
+                warning.innerHTML = `⚠️ Player not detected. Sync disabled, chat works.`;
+                overlayEl.appendChild(warning);
+            }
+        } else if (warningEl) {
+            warningEl.remove();
+        }
 
         // URL match status
         if (currentRoomState.urlMatch === true) {
