@@ -15,7 +15,6 @@
 
     // Overlay elements
     let overlayEl = null;
-    let miniToggle = null;
     let overlayStatus = null;
     let overlayDrift = null;
     let overlayUrlStatus = null;
@@ -283,7 +282,7 @@
         }
 
         if (isTopFrame) {
-            createOverlay();
+            createOverlay(true); // Create hidden initially
             sendUrlUpdate();
         }
 
@@ -518,15 +517,13 @@
                 break;
                 
             case 'restore_overlay':
-                if (overlayEl) {
+                if (!overlayEl) {
+                    createOverlay(false); // Re-create visible
+                } else {
                     overlayEl.style.cssText = overlayEl.style.cssText.replace('display: none !important;', '');
                     overlayEl.style.display = 'block';
-                    overlayVisible = true;
                 }
-                if (miniToggle) {
-                    miniToggle.style.cssText = miniToggle.style.cssText.replace('display: none !important;', '');
-                    miniToggle.style.display = 'none'; // Since full overlay is visible
-                }
+                overlayVisible = true;
                 break;
         }
 
@@ -539,45 +536,13 @@
         if (!overlayEl) return;
         overlayVisible = !overlayVisible;
         overlayEl.style.display = overlayVisible ? 'block' : 'none';
-        if (miniToggle) miniToggle.style.display = overlayVisible ? 'none' : 'flex';
+        if (!overlayVisible && chatPanelEl) {
+            chatPanelEl.style.display = 'none';
+        }
     }
 
-    function createOverlay() {
+    function createOverlay(initiallyHidden = false) {
         if (overlayEl || !isTopFrame) return;
-
-        // ─── Mini Toggle Button (visible when overlay is closed) ───
-        miniToggle = document.createElement('div');
-        miniToggle.id = 'WeWatch-mini-toggle';
-        miniToggle.innerHTML = '⚡';
-        Object.assign(miniToggle.style, {
-            position: 'fixed',
-            top: '20px',
-            right: '20px',
-            width: '36px',
-            height: '36px',
-            backgroundColor: 'rgba(99, 102, 241, 0.9)',
-            color: '#fff',
-            borderRadius: '50%',
-            display: 'flex', // visible by default when overlay is minimized
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            zIndex: '2147483647',
-            fontSize: '16px',
-            boxShadow: '0 2px 12px rgba(99, 102, 241, 0.5)',
-            transition: 'transform 0.2s, box-shadow 0.2s',
-            fontFamily: 'sans-serif'
-        });
-        miniToggle.addEventListener('mouseenter', () => {
-            miniToggle.style.transform = 'scale(1.15)';
-            miniToggle.style.boxShadow = '0 4px 20px rgba(99, 102, 241, 0.7)';
-        });
-        miniToggle.addEventListener('mouseleave', () => {
-            miniToggle.style.transform = 'scale(1)';
-            miniToggle.style.boxShadow = '0 2px 12px rgba(99, 102, 241, 0.5)';
-        });
-        miniToggle.addEventListener('click', toggleOverlay);
-        document.body.appendChild(miniToggle);
 
         // ─── Main Overlay ─────────────────────────────────────────
         overlayEl = document.createElement('div');
@@ -607,7 +572,7 @@
             borderRadius: '12px',
             fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
             zIndex: '2147483647',
-            display: 'none',
+            display: initiallyHidden ? 'none' : 'block',
             backdropFilter: 'blur(16px)',
             WebkitBackdropFilter: 'blur(16px)',
             transition: 'opacity 0.2s, background-color 0.2s',
@@ -660,9 +625,14 @@
             closeBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if (overlayEl) overlayEl.style.cssText += 'display: none !important;';
-                if (miniToggle) miniToggle.style.cssText += 'display: none !important;';
-                if (chatPanelEl) chatPanelEl.style.cssText += 'display: none !important;';
+                if (overlayEl) {
+                    overlayEl.remove();
+                    overlayEl = null; // Forces recreate next time
+                }
+                if (chatPanelEl) {
+                    chatPanelEl.remove();
+                    chatPanelEl = null;
+                }
                 overlayVisible = false;
             });
         }
