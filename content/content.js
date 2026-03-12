@@ -19,9 +19,11 @@
     let overlayDrift = null;
     let overlayUrlStatus = null;
     let overlayPresence = null;
-    let syncBtn = null;
     let goToPageBtn = null;
     let overlayVisible = false;
+
+    // Dragging globals
+    let isDragging = false, dragStartX = 0, dragStartY = 0, dragInitialLeft = 0, dragInitialTop = 0;
 
     // Chat elements
     let chatPanelEl = null;
@@ -619,23 +621,20 @@
         goToPageBtn = document.getElementById('sw-goto-btn');
         chatToggleBtn = document.getElementById('sw-chat-toggle');
 
-        // Close button → completely hides the widget
-        const closeBtn = document.getElementById('sw-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', (e) => {
+        // Ensure events are attached to the actual overlay element directly
+        overlayEl.addEventListener('click', (e) => {
+            if (e.target.id === 'sw-close' || e.target.closest('#sw-close')) {
                 e.preventDefault();
                 e.stopPropagation();
                 if (overlayEl) {
-                    overlayEl.remove();
-                    overlayEl = null; // Forces recreate next time
+                    overlayEl.style.display = 'none';
                 }
                 if (chatPanelEl) {
-                    chatPanelEl.remove();
-                    chatPanelEl = null;
+                    chatPanelEl.style.display = 'none';
                 }
                 overlayVisible = false;
-            });
-        }
+            }
+        });
 
 
         // Sync button
@@ -661,41 +660,30 @@
 
         // Dragging
         const header = document.getElementById('sw-header');
-        let isDragging = false, startX, startY, initialLeft, initialTop;
-
+        
         if (header) {
             header.addEventListener('mousedown', (e) => {
+                if (e.target.id === 'sw-close') return; // Don't drag if clicking close
                 isDragging = true;
-                startX = e.clientX;
-                startY = e.clientY;
+                dragStartX = e.clientX;
+                dragStartY = e.clientY;
                 const rect = overlayEl.getBoundingClientRect();
-                initialLeft = rect.left;
-                initialTop = rect.top;
+                dragInitialLeft = rect.left;
+                dragInitialTop = rect.top;
                 
                 // Switch from right-based to left-based positioning for dragging
                 overlayEl.style.right = 'auto';
-                overlayEl.style.left = initialLeft + 'px';
-                overlayEl.style.top = initialTop + 'px';
+                overlayEl.style.bottom = 'auto';
+                overlayEl.style.left = dragInitialLeft + 'px';
+                overlayEl.style.top = dragInitialTop + 'px';
                 
                 header.style.cursor = 'grabbing';
                 e.preventDefault();
             });
         }
 
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            const deltaX = e.clientX - startX;
-            const deltaY = e.clientY - startY;
-            overlayEl.style.left = (initialLeft + deltaX) + 'px';
-            overlayEl.style.top = (initialTop + deltaY) + 'px';
-        });
-
-        document.addEventListener('mouseup', () => {
-            if (isDragging) {
-                isDragging = false;
-                if (header) header.style.cursor = 'grab';
-            }
-        });
+        // We now handle mousemove/mouseup globally below outside createOverlay 
+        // to avoid duplicate listeners.
 
         // Get peerId from storage
         chrome.storage.local.get(['peerId'], (result) => {
@@ -705,6 +693,23 @@
         // Create chat panel
         createChatPanel();
     }
+
+    // ─── Global Event Listeners for Dragging ────────────────────────
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging || !overlayEl) return;
+        const deltaX = e.clientX - dragStartX;
+        const deltaY = e.clientY - dragStartY;
+        overlayEl.style.left = (dragInitialLeft + deltaX) + 'px';
+        overlayEl.style.top = (dragInitialTop + deltaY) + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isDragging) {
+            isDragging = false;
+            const header = document.getElementById('sw-header');
+            if (header) header.style.cursor = 'grab';
+        }
+    });
 
     // ─── Chat Panel ───────────────────────────────────────────
 
