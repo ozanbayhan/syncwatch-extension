@@ -1,15 +1,15 @@
-# Privacy Policy — SyncWatch
+# Privacy Policy — WeWatch
 
 **Last Updated:** March 11, 2026
 
-## What SyncWatch Does
-SyncWatch is a browser extension that allows two users to synchronize video and audio playback in real-time. Users create or join rooms using a unique code and share the same playback state.
+## What WeWatch Does
+WeWatch is a browser extension that allows two users to synchronize video and audio playback in real-time. Users create or join rooms using a unique code and share the same playback state.
 
 ## Data We Collect
 
 ### 1. Page URL (Temporary)
 - **What:** The URL of the page you are currently viewing.
-- **Why:** To check if you and your sync partner are on the same page, and to show you how many SyncWatch users are on the same page.
+- **Why:** To check if you and your sync partner are on the same page, and to show you how many WeWatch users are on the same page.
 - **How stored:** URLs are stored temporarily in Firebase Realtime Database only while you are connected to a room. They are deleted when you leave the room.
 - **Not stored permanently.** We do not build browsing history profiles.
 
@@ -20,7 +20,7 @@ SyncWatch is a browser extension that allows two users to synchronize video and 
 
 ### 3. Presence Data (Temporary)
 - **What:** An anonymized page identifier and a timestamp.
-- **Why:** To show the count of SyncWatch users on the same page.
+- **Why:** To show the count of WeWatch users on the same page.
 - **How stored:** Automatically deleted after 90 seconds of inactivity.
 
 ## Data We Do NOT Collect

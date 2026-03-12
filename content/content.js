@@ -1,4 +1,4 @@
-// SyncWatch Content Script
+// WeWatch Content Script
 // Detects and controls media elements on the page
 // locales.js is loaded before this file via manifest.json content_scripts
 
@@ -154,32 +154,32 @@
         // Priority 1: Site-specific (most reliable)
         elements = findSiteSpecificPlayers();
         if (elements.length > 0) {
-            console.log('[SyncWatch] Detected media via site-specific selector');
+            console.log('[WeWatch] Detected media via site-specific selector');
             return elements;
         }
 
         // Priority 2: Standard HTML5
         elements = findHTML5Media();
         if (elements.length > 0) {
-            console.log('[SyncWatch] Detected HTML5 media');
+            console.log('[WeWatch] Detected HTML5 media');
             return elements;
         }
 
         // Priority 3: Shadow DOM
         elements = findShadowMedia();
         if (elements.length > 0) {
-            console.log('[SyncWatch] Detected media in Shadow DOM');
+            console.log('[WeWatch] Detected media in Shadow DOM');
             return elements;
         }
 
         // Priority 4: Custom player frameworks
         elements = findCustomPlayerElements();
         if (elements.length > 0) {
-            console.log('[SyncWatch] Detected media in custom player');
+            console.log('[WeWatch] Detected media in custom player');
             return elements;
         }
 
-        console.log('[SyncWatch] No media elements detected');
+        console.log('[WeWatch] No media elements detected');
         return [];
     }
 
@@ -208,8 +208,8 @@
     }
 
     function attachMediaListeners(media) {
-        if (!media || media._syncWatchListening) return;
-        media._syncWatchListening = true;
+        if (!media || media._WeWatchListening) return;
+        media._WeWatchListening = true;
 
         const events = ['play', 'pause', 'seeked', 'ratechange', 'waiting', 'playing'];
 
@@ -258,6 +258,18 @@
             if (syncInterval) { clearInterval(syncInterval); syncInterval = null; }
             if (isTopFrame) updateDriftUI();
         });
+
+        media.addEventListener('timeupdate', () => {
+            if (!media.paused && Math.floor(media.currentTime) % 1 === 0) {
+                try {
+                    chrome.runtime.sendMessage({
+                        type: 'media_timeupdate',
+                        currentTime: media.currentTime,
+                        duration: media.duration
+                    });
+                } catch (e) { /* ignore */ }
+            }
+        });
     }
 
     // ─── Init ─────────────────────────────────────────────────
@@ -301,6 +313,17 @@
                 }
             }
         }, 2000);
+
+        // Global capture listener for any media play event
+        document.addEventListener('play', (e) => {
+            if (e.target && (e.target.tagName === 'VIDEO' || e.target.tagName === 'AUDIO')) {
+                if (activeMedia !== e.target) {
+                    activeMedia = e.target;
+                    attachMediaListeners(activeMedia);
+                    notifyMediaFound();
+                }
+            }
+        }, true);
     }
 
     function handleNewMedia(element) {
@@ -441,8 +464,9 @@
             chrome.runtime.sendMessage({
                 type: 'media_detected',
                 tagName: activeMedia.tagName,
-                duration: activeMedia.duration || 0,
-                src: activeMedia.currentSrc || activeMedia.src || 'unknown'
+                src: activeMedia.currentSrc || activeMedia.src,
+                currentTime: activeMedia.currentTime || 0,
+                duration: activeMedia.duration || 0
             });
         } catch (e) { /* ignore */ }
         if (isTopFrame) updateOverlayUI();
@@ -487,7 +511,7 @@
                 break;
 
             case 'lang_changed':
-                if (msg.lang && typeof SYNCWATCH_LOCALES !== 'undefined' && SYNCWATCH_LOCALES[msg.lang]) {
+                if (msg.lang && typeof WeWatch_LOCALES !== 'undefined' && WeWatch_LOCALES[msg.lang]) {
                     currentLang = msg.lang;
                     updateOverlayUI();
                 }
@@ -511,7 +535,7 @@
 
         // ─── Mini Toggle Button (visible when overlay is closed) ───
         miniToggle = document.createElement('div');
-        miniToggle.id = 'syncwatch-mini-toggle';
+        miniToggle.id = 'WeWatch-mini-toggle';
         miniToggle.innerHTML = '⚡';
         Object.assign(miniToggle.style, {
             position: 'fixed',
@@ -545,10 +569,10 @@
 
         // ─── Main Overlay ─────────────────────────────────────────
         overlayEl = document.createElement('div');
-        overlayEl.id = 'syncwatch-overlay';
+        overlayEl.id = 'WeWatch-overlay';
         overlayEl.innerHTML = `
             <div id="sw-header" style="cursor:grab;font-weight:bold;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-size:12px;background:linear-gradient(135deg,#A78BFA,#6366F1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">⚡ SyncWatch</span>
+                <span style="font-size:12px;background:linear-gradient(135deg,#A78BFA,#6366F1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">⚡ WeWatch</span>
                 <span id="sw-close" style="cursor:pointer;font-size:14px;color:#71717a;line-height:1;padding:2px 4px;">&times;</span>
             </div>
             <div id="sw-presence" style="font-size:11px;color:#a5b4fc;margin-bottom:4px;display:none;"></div>
@@ -589,6 +613,25 @@
         });
 
         document.body.appendChild(overlayEl);
+
+        // ─── Live Chat Overlay ─────────────────────────────────────
+        liveChatEl = document.createElement('div');
+        liveChatEl.id = 'WeWatch-live-chat';
+        Object.assign(liveChatEl.style, {
+            position: 'fixed',
+            bottom: '80px', // Above the player controls usually
+            left: '20px',
+            width: '300px',
+            maxHeight: '400px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-end',
+            gap: '8px',
+            zIndex: '2147483645',
+            pointerEvents: 'none', // Let clicks pass through to video
+            fontFamily: "'Inter', -apple-system, sans-serif"
+        });
+        document.body.appendChild(liveChatEl);
 
         overlayStatus = document.getElementById('sw-status');
         overlayDrift = document.getElementById('sw-drift');
@@ -665,7 +708,7 @@
         if (chatPanelEl || !isTopFrame) return;
 
         chatPanelEl = document.createElement('div');
-        chatPanelEl.id = 'syncwatch-chat';
+        chatPanelEl.id = 'WeWatch-chat';
         chatPanelEl.innerHTML = `
             <div class="chat-header" style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:13px;color:#e4e4eb;">
                 <span>💬 Chat</span>
@@ -699,37 +742,37 @@
         // Inject chat styles
         const chatStyles = document.createElement('style');
         chatStyles.textContent = `
-            #syncwatch-chat .chat-message {
+            #WeWatch-chat .chat-message {
                 background: rgba(255,255,255,0.05);
                 padding: 8px 10px;
                 border-radius: 8px;
                 font-size: 12px;
             }
-            #syncwatch-chat .chat-message-header {
+            #WeWatch-chat .chat-message-header {
                 display: flex;
                 justify-content: space-between;
                 margin-bottom: 4px;
                 font-size: 10px;
             }
-            #syncwatch-chat .chat-username {
+            #WeWatch-chat .chat-username {
                 font-weight: 600;
                 color: #a5b4fc;
             }
-            #syncwatch-chat .chat-username.me {
+            #WeWatch-chat .chat-username.me {
                 color: #34d399;
             }
-            #syncwatch-chat .chat-time {
+            #WeWatch-chat .chat-time {
                 color: #71717a;
             }
-            #syncwatch-chat .chat-text {
+            #WeWatch-chat .chat-text {
                 color: #e4e4eb;
                 line-height: 1.4;
                 word-wrap: break-word;
             }
-            #syncwatch-chat #chat-input:focus {
+            #WeWatch-chat #chat-input:focus {
                 border-color: rgba(99,102,241,0.5);
             }
-            #syncwatch-chat #chat-send:hover {
+            #WeWatch-chat #chat-send:hover {
                 opacity: 0.9;
             }
         `;
@@ -808,25 +851,68 @@
     }
 
     function appendChatMessage(msg) {
+        // 1. Add to the chat panel
         const messagesDiv = document.getElementById('chat-messages');
-        if (!messagesDiv) return;
+        if (messagesDiv) {
+            const msgEl = document.createElement('div');
+            msgEl.className = 'chat-message';
 
-        const msgEl = document.createElement('div');
-        msgEl.className = 'chat-message';
+            const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const isMe = msg.from === myPeerId;
 
-        const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const isMe = msg.from === myPeerId;
+            msgEl.innerHTML = `
+                <div class="chat-message-header">
+                    <span class="chat-username ${isMe ? 'me' : ''}">${escapeHtml(msg.username)}</span>
+                    <span class="chat-time">${time}</span>
+                </div>
+                <div class="chat-text">${escapeHtml(msg.text)}</div>
+            `;
 
-        msgEl.innerHTML = `
-            <div class="chat-message-header">
-                <span class="chat-username ${isMe ? 'me' : ''}">${escapeHtml(msg.username)}</span>
-                <span class="chat-time">${time}</span>
-            </div>
-            <div class="chat-text">${escapeHtml(msg.text)}</div>
-        `;
+            messagesDiv.appendChild(msgEl);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
 
-        messagesDiv.appendChild(msgEl);
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        // 2. Add to the live chat overlay (if new)
+        if (msg.timestamp > lastChatTimestamp && liveChatEl) {
+            const isMe = msg.from === myPeerId;
+            const bubble = document.createElement('div');
+            Object.assign(bubble.style, {
+                background: 'rgba(15, 15, 23, 0.6)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                color: '#fff',
+                fontSize: '13px',
+                border: '1px solid rgba(255,255,255,0.1)',
+                opacity: '0',
+                transform: 'translateY(10px)',
+                transition: 'all 0.3s ease',
+                wordWrap: 'break-word',
+                textShadow: '0 1px 2px rgba(0,0,0,0.8)'
+            });
+
+            bubble.innerHTML = `<b style="color:${isMe ? '#34d399' : '#a5b4fc'}; font-size: 11px; margin-right: 6px;">${escapeHtml(msg.username)}</b> ${escapeHtml(msg.text)}`;
+            liveChatEl.appendChild(bubble);
+
+            // Animate in
+            requestAnimationFrame(() => {
+                bubble.style.opacity = '1';
+                bubble.style.transform = 'translateY(0)';
+            });
+
+            // Remove after 6 seconds
+            setTimeout(() => {
+                bubble.style.opacity = '0';
+                bubble.style.transform = 'translateY(-10px)';
+                setTimeout(() => bubble.remove(), 300);
+            }, 6000);
+            
+            // Limit to max 7 visible bubbles
+            while (liveChatEl.children.length > 7) {
+                liveChatEl.children[0].remove();
+            }
+        }
     }
 
     function escapeHtml(text) {

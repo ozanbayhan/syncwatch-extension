@@ -1,4 +1,4 @@
-// SyncWatch Firebase Configuration
+// WeWatch Firebase Configuration
 // Replace with your Firebase Realtime Database URL
 const FIREBASE_CONFIG = {
     // Go to https://console.firebase.google.com

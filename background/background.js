@@ -1,4 +1,4 @@
-// SyncWatch Background Service Worker
+// WeWatch Background Service Worker
 // Uses Firebase Realtime Database REST API for signaling
 
 // ─── Config ───────────────────────────────────────────────
@@ -8,7 +8,7 @@ try {
     importScripts('../config.js');
     FIREBASE_DB_URL = FIREBASE_CONFIG.databaseURL.replace(/\/$/, '');
 } catch (e) {
-    console.error('[SyncWatch] Failed to load config.js');
+    console.error('[WeWatch] Failed to load config.js');
 }
 
 // ─── Constants ────────────────────────────────────────────
@@ -21,7 +21,8 @@ const INITIAL_STATE = {
     myUrl: null,
     peerUrl: null,
     urlMatch: null,
-    presenceCount: 0
+    presenceCount: 0,
+    joinRequests: [] // Array of { peerId, username, timestamp }
 };
 
 const PRESENCE_HEARTBEAT_MS = 30000;
@@ -67,7 +68,7 @@ async function firebase(method, path, data = null) {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return await res.json();
     } catch (err) {
-        console.warn(`[SyncWatch] Firebase ${method} ${path} failed:`, err.message);
+        console.warn(`[WeWatch] Firebase ${method} ${path} failed:`, err.message);
         return null;
     }
 }
@@ -173,6 +174,7 @@ async function createRoom(isPublic = false, roomName = null, description = null)
                 username: finalUsername
             }
         },
+        joinRequests: {},
         urls: norm ? { [peerId]: norm } : {},
         lastEvent: null,
         lastActivity: Date.now()
@@ -264,30 +266,18 @@ async function joinRoom(targetRoomId) {
     const currentUrl = await getActiveTabUrl();
     const norm = currentUrl ? normalizeUrl(currentUrl) : null;
 
-    // Add user with username to peers
-    await firebase('PATCH', `rooms/${code}/peers`, {
+    // Add user with username to joinRequests instead of peers
+    await firebase('PATCH', `rooms/${code}/joinRequests`, {
         [peerId]: {
-            joined: Date.now(),
-            username: finalUsername
+            timestamp: Date.now(),
+            username: finalUsername,
+            url: norm || ''
         }
     });
 
     await firebase('PATCH', `rooms/${code}`, {
-        peerJoined: Date.now(),
         lastActivity: Date.now()
     });
-
-    if (norm) {
-        await firebase('PATCH', `rooms/${code}/urls`, { [peerId]: norm });
-    }
-
-    // Update publicRooms userCount if public
-    if (room.isPublic) {
-        await firebase('PATCH', `publicRooms/${code}`, {
-            userCount: peerCount + 1,
-            lastActivity: Date.now()
-        });
-    }
 
     // Store username in global mapping
     await firebase('PUT', `usernames/${peerId}`, {
@@ -307,15 +297,67 @@ async function joinRoom(targetRoomId) {
 
     await chrome.storage.local.set({
         roomId: code,
-        peerConnected: peerCount >= 1, // Connected if there's at least 1 other peer
+        peerConnected: false, // Initially false because we are waiting for host approval
         lastEventTimestamp: 0,
         isHost: false,
         myUrl: norm,
         peerUrl,
-        urlMatch
+        urlMatch,
+        waitingForApproval: true
     });
 
     broadcastState();
+    return { ok: true };
+}
+
+async function acceptJoinRequest(requesterId) {
+    const { roomId, peerId } = await chrome.storage.local.get(['roomId', 'peerId']);
+    if (!roomId) return { ok: false };
+
+    const room = await firebase('GET', `rooms/${roomId}`);
+    if (!room || !room.joinRequests || !room.joinRequests[requesterId]) return { ok: false };
+
+    const request = room.joinRequests[requesterId];
+
+    // Remove from joinRequests
+    await firebase('DELETE', `rooms/${roomId}/joinRequests/${requesterId}`);
+
+    // Add to peers
+    await firebase('PATCH', `rooms/${roomId}/peers`, {
+        [requesterId]: {
+            joined: Date.now(),
+            username: request.username
+        }
+    });
+
+    if (request.url) {
+        await firebase('PATCH', `rooms/${roomId}/urls`, { [requesterId]: request.url });
+    }
+
+    // Update room activity explicitly
+    await firebase('PATCH', `rooms/${roomId}`, {
+        peerJoined: Date.now(),
+        lastActivity: Date.now()
+    });
+
+    // Update publicRooms userCount if public
+    if (room.isPublic) {
+        const currentPeers = room.peers ? Object.keys(room.peers).length : 0;
+        await firebase('PATCH', `publicRooms/${roomId}`, {
+            userCount: currentPeers + 1,
+            lastActivity: Date.now()
+        });
+    }
+
+    return { ok: true };
+}
+
+async function denyJoinRequest(requesterId) {
+    const { roomId } = await chrome.storage.local.get('roomId');
+    if (!roomId) return { ok: false };
+    
+    // Remove from joinRequests
+    await firebase('DELETE', `rooms/${roomId}/joinRequests/${requesterId}`);
     return { ok: true };
 }
 
@@ -328,6 +370,7 @@ async function leaveRoom() {
 
         await firebase('DELETE', `rooms/${roomId}/peers/${peerId}`);
         await firebase('DELETE', `rooms/${roomId}/urls/${peerId}`);
+        await firebase('DELETE', `rooms/${roomId}/joinRequests/${peerId}`);
 
         const peers = await firebase('GET', `rooms/${roomId}/peers`);
         const remainingCount = peers ? Object.keys(peers).length : 0;
@@ -601,7 +644,32 @@ async function pollRoom() {
             peerUrl,
             urlMatch
         });
-        broadcastState();
+    }
+    
+    // Process Host / Guest Approval logic
+    let extraState = {};
+    if (state.isHost) {
+        const joinReqs = room.joinRequests ? Object.entries(room.joinRequests).map(([id, data]) => ({ id, ...data })) : [];
+        extraState.joinRequests = joinReqs;
+    } else if (state.waitingForApproval) {
+        // We are a guest waiting for approval
+        if (peers.includes(state.peerId)) {
+            // We were accepted!
+            await chrome.storage.local.set({ waitingForApproval: false, peerConnected: true });
+            extraState.waitingForApproval = false;
+        } else if (!room.joinRequests || !room.joinRequests[state.peerId]) {
+            // We were denied! (Removed from joinRequests but not in peers)
+            await chrome.storage.local.set(INITIAL_STATE);
+            broadcastState({ error: 'Host denied your request.' });
+            return null;
+        } else {
+            // Still waiting
+            extraState.waitingForApproval = true;
+        }
+    }
+
+    if (stateChanged || Object.keys(extraState).length > 0) {
+        broadcastState(extraState);
     }
 
     // New events from other peer
@@ -624,6 +692,7 @@ async function broadcastState(extra = {}) {
         roomId: state.roomId,
         peerConnected: state.peerConnected,
         isHost: state.isHost,
+        waitingForApproval: state.waitingForApproval || false,
         myUrl: state.myUrl,
         peerUrl: state.peerUrl,
         urlMatch: state.urlMatch,
@@ -661,6 +730,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             joinRoom(msg.roomId)
                 .then(result => sendResponse(result))
                 .catch(() => sendResponse({ error: 'Failed to join' }));
+            return true;
+            
+        case 'accept_join_request':
+            acceptJoinRequest(msg.requesterId)
+                .then(result => sendResponse(result))
+                .catch(() => sendResponse({ ok: false }));
+            return true;
+            
+        case 'deny_join_request':
+            denyJoinRequest(msg.requesterId)
+                .then(result => sendResponse(result))
+                .catch(() => sendResponse({ ok: false }));
             return true;
 
         case 'send_chat':
@@ -705,7 +786,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             chrome.storage.local.set({
                 mediaInfo: {
                     tagName: String(msg.tagName || '').slice(0, 10),
-                    src: String(msg.src || '').slice(0, 500)
+                    src: String(msg.src || '').slice(0, 500),
+                    currentTime: msg.currentTime || 0,
+                    duration: msg.duration || 0
+                }
+            });
+            sendResponse({ ok: true });
+            return true;
+            
+        case 'media_timeupdate':
+            chrome.storage.local.get(['mediaInfo']).then((result) => {
+                if (result.mediaInfo) {
+                    result.mediaInfo.currentTime = msg.currentTime || 0;
+                    result.mediaInfo.duration = msg.duration || 0;
+                    chrome.storage.local.set({ mediaInfo: result.mediaInfo });
                 }
             });
             sendResponse({ ok: true });

@@ -1,4 +1,4 @@
-# Firebase Security Rules for SyncWatch
+# Firebase Security Rules for WeWatch
 
 Apply these rules in Firebase Console → Realtime Database → Rules.
 
