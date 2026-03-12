@@ -22,7 +22,7 @@
     let overlayPresence = null;
     let syncBtn = null;
     let goToPageBtn = null;
-    let overlayVisible = true;
+    let overlayVisible = false;
 
     // Chat elements
     let chatPanelEl = null;
@@ -401,9 +401,9 @@
                     }
                 });
 
-                // Presence every 15 seconds
+                // Presence every 15 seconds (and on first run)
                 presencePollCounter++;
-                if (presencePollCounter % 15 === 0) {
+                if (presencePollCounter === 1 || presencePollCounter % 15 === 0) {
                     chrome.runtime.sendMessage({
                         type: 'get_presence',
                         url: window.location.href
@@ -516,6 +516,18 @@
                     updateOverlayUI();
                 }
                 break;
+                
+            case 'restore_overlay':
+                if (overlayEl) {
+                    overlayEl.style.cssText = overlayEl.style.cssText.replace('display: none !important;', '');
+                    overlayEl.style.display = 'block';
+                    overlayVisible = true;
+                }
+                if (miniToggle) {
+                    miniToggle.style.cssText = miniToggle.style.cssText.replace('display: none !important;', '');
+                    miniToggle.style.display = 'none'; // Since full overlay is visible
+                }
+                break;
         }
 
         return true;
@@ -546,7 +558,7 @@
             backgroundColor: 'rgba(99, 102, 241, 0.9)',
             color: '#fff',
             borderRadius: '50%',
-            display: 'none', // hidden by default, shown when overlay is closed
+            display: 'flex', // visible by default when overlay is minimized
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
@@ -595,6 +607,7 @@
             borderRadius: '12px',
             fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
             zIndex: '2147483647',
+            display: 'none',
             backdropFilter: 'blur(16px)',
             WebkitBackdropFilter: 'blur(16px)',
             transition: 'opacity 0.2s, background-color 0.2s',
@@ -641,8 +654,19 @@
         goToPageBtn = document.getElementById('sw-goto-btn');
         chatToggleBtn = document.getElementById('sw-chat-toggle');
 
-        // Close button → hides overlay, shows mini toggle
-        document.getElementById('sw-close').addEventListener('click', toggleOverlay);
+        // Close button → completely hides the widget
+        const closeBtn = document.getElementById('sw-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (overlayEl) overlayEl.style.cssText += 'display: none !important;';
+                if (miniToggle) miniToggle.style.cssText += 'display: none !important;';
+                if (chatPanelEl) chatPanelEl.style.cssText += 'display: none !important;';
+                overlayVisible = false;
+            });
+        }
+
 
         // Sync button
         syncBtn.addEventListener('click', () => {
@@ -667,23 +691,33 @@
 
         // Dragging
         const header = document.getElementById('sw-header');
-        let isDragging = false, startX, startY, startRight, startTop;
+        let isDragging = false, startX, startY, initialLeft, initialTop;
 
-        header.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            startX = e.clientX;
-            startY = e.clientY;
-            const rect = overlayEl.getBoundingClientRect();
-            startRight = window.innerWidth - rect.right;
-            startTop = rect.top;
-            header.style.cursor = 'grabbing';
-            e.preventDefault();
-        });
+        if (header) {
+            header.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = overlayEl.getBoundingClientRect();
+                initialLeft = rect.left;
+                initialTop = rect.top;
+                
+                // Switch from right-based to left-based positioning for dragging
+                overlayEl.style.right = 'auto';
+                overlayEl.style.left = initialLeft + 'px';
+                overlayEl.style.top = initialTop + 'px';
+                
+                header.style.cursor = 'grabbing';
+                e.preventDefault();
+            });
+        }
 
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
-            overlayEl.style.right = (startRight - (e.clientX - startX)) + 'px';
-            overlayEl.style.top = (startTop + (e.clientY - startY)) + 'px';
+            const deltaX = e.clientX - startX;
+            const deltaY = e.clientY - startY;
+            overlayEl.style.left = (initialLeft + deltaX) + 'px';
+            overlayEl.style.top = (initialTop + deltaY) + 'px';
         });
 
         document.addEventListener('mouseup', () => {

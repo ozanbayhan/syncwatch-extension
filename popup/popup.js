@@ -479,4 +479,11 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(() => {
         if (!viewSynced.classList.contains('hidden')) checkMediaStatus();
     }, 1000);
+    
+    // Attempt to restore overlay in the active tab when popup opens
+    chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+        if (tab && tab.id) {
+            chrome.tabs.sendMessage(tab.id, { type: 'restore_overlay' }).catch(() => {});
+        }
+    });
 });
