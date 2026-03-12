@@ -356,10 +356,15 @@
                 // Poll events
                 chrome.runtime.sendMessage({ type: 'poll_room' }, (response) => {
                     if (chrome.runtime.lastError) return;
-                    if (response && response.event && activeMedia) {
+                    if (response && response.event) {
                         if (response.event.timestamp > localLastEventTimestamp) {
                             localLastEventTimestamp = response.event.timestamp;
-                            applyRemoteEvent(response.event);
+                            try {
+                                chrome.runtime.sendMessage({
+                                    type: 'forward_sync',
+                                    event: response.event
+                                });
+                            } catch (e) { /* extension context invalidated */ }
                         }
                     }
                 });
@@ -457,7 +462,7 @@
                 break;
 
             case 'sync_command':
-                if (activeMedia) applyRemoteEvent(msg);
+                applyRemoteEvent(msg);
                 sendResponse({ ok: true });
                 break;
 

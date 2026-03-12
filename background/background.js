@@ -744,6 +744,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             });
             return true;
 
+        case 'forward_sync':
+            if (sender.tab) {
+                chrome.tabs.sendMessage(sender.tab.id, {
+                    type: 'sync_command',
+                    ...msg.event
+                }).catch(() => {});
+            }
+            sendResponse({ ok: true });
+            return true;
+
         case 'navigate_to_peer':
             chrome.storage.local.get(['peerUrl']).then(({ peerUrl }) => {
                 if (peerUrl && sender.tab) {
