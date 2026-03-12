@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "SyncWatch",
+  "name": "WeWatch",
   "version": "3.0.0",
   "description": "Watch videos and listen to audio in sync with a friend",
   "permissions": [

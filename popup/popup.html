@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SyncWatch</title>
+  <title>WeWatch</title>
   <link rel="stylesheet" href="popup.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,7 +24,7 @@
             </linearGradient>
           </defs>
         </svg>
-        <span class="logo-text">SyncWatch</span>
+        <span class="logo-text">WeWatch</span>
       </div>
       <div class="header-right">
         <select id="langSelect" class="lang-select" title="Language"></select>
@@ -115,6 +115,15 @@
       <button class="btn btn-secondary" id="btnBackFromBrowse" data-i18n="back">Back</button>
     </div>
 
+    <!-- Request Pending View -->
+    <div id="viewRequestPending" class="view hidden">
+      <div class="hero">
+        <p class="hero-text">Request Sent</p>
+        <p class="hero-sub pulse">Waiting for host approval...</p>
+      </div>
+      <button class="btn btn-danger" id="btnCancelRequest" data-i18n="leaveRoom">Cancel</button>
+    </div>
+
     <!-- Waiting View -->
     <div id="viewWaiting" class="view hidden">
       <div class="room-card">
@@ -133,6 +142,13 @@
           <span data-i18n="waitingPeer">Waiting for peer...</span>
         </p>
       </div>
+
+      <!-- Join Requests Panel (Host Only) -->
+      <div class="join-requests-panel hidden" id="joinRequestsPanelWaiting">
+        <h4>Join Requests <span class="badge" id="joinReqCountWaiting">0</span></h4>
+        <div class="request-list" id="requestListWaiting"></div>
+      </div>
+
       <button class="btn btn-danger" id="btnLeaveWaiting" data-i18n="leaveRoom">Leave Room</button>
     </div>
 
@@ -163,8 +179,17 @@
             <rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/>
             <path d="M8 8L13 10.5L8 13V8Z" fill="currentColor"/>
           </svg>
-          <span id="mediaLabel" data-i18n="detectingMedia">Detecting media...</span>
+          <div style="display: flex; flex-direction: column;">
+            <span id="mediaLabel" data-i18n="detectingMedia">Detecting media...</span>
+            <span id="mediaDuration" style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;"></span>
+          </div>
         </div>
+      </div>
+
+      <!-- Join Requests Panel (Host Only) -->
+      <div class="join-requests-panel hidden" id="joinRequestsPanelSynced">
+        <h4>Join Requests <span class="badge" id="joinReqCountSynced">0</span></h4>
+        <div class="request-list" id="requestListSynced"></div>
       </div>
 
       <button class="btn btn-danger" id="btnDisconnect" data-i18n="disconnect">Disconnect</button>

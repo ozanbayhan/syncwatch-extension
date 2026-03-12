@@ -1,7 +1,7 @@
-// SyncWatch Internationalization (i18n)
+// WeWatch Internationalization (i18n)
 // 12 languages supported
 
-const SYNCWATCH_LOCALES = {
+const WeWatch_LOCALES = {
     en: {
         name: 'English',
         flag: '🇬🇧',
@@ -219,7 +219,24 @@ const SYNCWATCH_LOCALES = {
         language: 'Langue',
         disconnected: 'Déconnecté',
         show: 'Afficher',
-        hide: 'Masquer'
+        hide: 'Masquer',
+        advancedOptions: 'Options avancées',
+        hideOptions: 'Masquer les options',
+        makePublic: 'Rendre la salle publique',
+        roomNamePlaceholder: 'Nom de salle (facultatif)',
+        roomDescPlaceholder: 'Que regardez-vous ? (facultatif)',
+        browsePublicRooms: 'Parcourir les salles publiques',
+        browseRooms: 'Parcourir les salles publiques',
+        allRooms: 'Toutes les salles',
+        emptyRooms: 'Salles vides',
+        halfFull: 'À moitié pleines',
+        almostFull: 'Presque pleines',
+        noRoomsFound: 'Aucune salle publique trouvée',
+        joinRoom: 'Rejoindre la salle',
+        back: 'Retour',
+        chat: 'Chat',
+        chatPlaceholder: 'Écrivez un message...',
+        send: 'Envoyer'
     },
     de: {
         name: 'Deutsch',
@@ -261,7 +278,24 @@ const SYNCWATCH_LOCALES = {
         language: 'Sprache',
         disconnected: 'Getrennt',
         show: 'Anzeigen',
-        hide: 'Ausblenden'
+        hide: 'Ausblenden',
+        advancedOptions: 'Erweiterte Optionen',
+        hideOptions: 'Optionen ausblenden',
+        makePublic: 'Raum öffentlich machen',
+        roomNamePlaceholder: 'Raumname (optional)',
+        roomDescPlaceholder: 'Was schaust du? (optional)',
+        browsePublicRooms: 'Öffentliche Räume durchsuchen',
+        browseRooms: 'Öffentliche Räume durchsuchen',
+        allRooms: 'Alle Räume',
+        emptyRooms: 'Leere Räume',
+        halfFull: 'Halb voll',
+        almostFull: 'Fast voll',
+        noRoomsFound: 'Keine öffentlichen Räume gefunden',
+        joinRoom: 'Raum beitreten',
+        back: 'Zurück',
+        chat: 'Chat',
+        chatPlaceholder: 'Schreibe eine Nachricht...',
+        send: 'Senden'
     },
     pt: {
         name: 'Português',
@@ -303,7 +337,24 @@ const SYNCWATCH_LOCALES = {
         language: 'Idioma',
         disconnected: 'Desconectado',
         show: 'Mostrar',
-        hide: 'Ocultar'
+        hide: 'Ocultar',
+        advancedOptions: 'Opções avançadas',
+        hideOptions: 'Ocultar opções',
+        makePublic: 'Tornar sala pública',
+        roomNamePlaceholder: 'Nome da sala (opcional)',
+        roomDescPlaceholder: 'O que você está assistindo? (opcional)',
+        browsePublicRooms: 'Procurar Salas Públicas',
+        browseRooms: 'Procurar Salas Públicas',
+        allRooms: 'Todas as salas',
+        emptyRooms: 'Salas vazias',
+        halfFull: 'Meio cheias',
+        almostFull: 'Quase cheias',
+        noRoomsFound: 'Nenhuma sala pública encontrada',
+        joinRoom: 'Entrar na Sala',
+        back: 'Voltar',
+        chat: 'Chat',
+        chatPlaceholder: 'Digite uma mensagem...',
+        send: 'Enviar'
     },
     ru: {
         name: 'Русский',
@@ -345,7 +396,24 @@ const SYNCWATCH_LOCALES = {
         language: 'Язык',
         disconnected: 'Отключено',
         show: 'Показать',
-        hide: 'Скрыть'
+        hide: 'Скрыть',
+        advancedOptions: 'Дополнительные настройки',
+        hideOptions: 'Скрыть настройки',
+        makePublic: 'Сделать комнату публичной',
+        roomNamePlaceholder: 'Имя комнаты (необязательно)',
+        roomDescPlaceholder: 'Что вы смотрите? (необязательно)',
+        browsePublicRooms: 'Смотреть публичные комнаты',
+        browseRooms: 'Смотреть публичные комнаты',
+        allRooms: 'Все комнаты',
+        emptyRooms: 'Пустые комнаты',
+        halfFull: 'Наполовину полные',
+        almostFull: 'Почти полные',
+        noRoomsFound: 'Публичные комнаты не найдены',
+        joinRoom: 'Присоединиться к комнате',
+        back: 'Назад',
+        chat: 'Чат',
+        chatPlaceholder: 'Введите сообщение...',
+        send: 'Отправить'
     },
     ja: {
         name: '日本語',
@@ -387,7 +455,24 @@ const SYNCWATCH_LOCALES = {
         language: '言語',
         disconnected: '未接続',
         show: '表示',
-        hide: '非表示'
+        hide: '非表示',
+        advancedOptions: '詳細オプション',
+        hideOptions: 'オプションを隠す',
+        makePublic: '部屋を公開する',
+        roomNamePlaceholder: '部屋名（オプション）',
+        roomDescPlaceholder: '何を見ていますか？（オプション）',
+        browsePublicRooms: '公開ルームを閲覧',
+        browseRooms: '公開ルームを閲覧',
+        allRooms: '全てのルーム',
+        emptyRooms: '空のルーム',
+        halfFull: '半数',
+        almostFull: 'ほぼ満室',
+        noRoomsFound: '公開ルームが見つかりません',
+        joinRoom: 'ルームに参加',
+        back: '戻る',
+        chat: 'チャット',
+        chatPlaceholder: 'メッセージを入力...',
+        send: '送信'
     },
     ko: {
         name: '한국어',
@@ -429,7 +514,24 @@ const SYNCWATCH_LOCALES = {
         language: '언어',
         disconnected: '연결 안 됨',
         show: '표시',
-        hide: '숨기기'
+        hide: '숨기기',
+        advancedOptions: '고급 옵션',
+        hideOptions: '옵션 숨기기',
+        makePublic: '공개 방 만들기',
+        roomNamePlaceholder: '방 이름 (선택 사항)',
+        roomDescPlaceholder: '무엇을 보고 있나요? (선택 사항)',
+        browsePublicRooms: '공개 방 찾아보기',
+        browseRooms: '공개 방 찾아보기',
+        allRooms: '모든 방',
+        emptyRooms: '빈 방',
+        halfFull: '절반 참',
+        almostFull: '거의 꽉 참',
+        noRoomsFound: '공개 방을 찾을 수 없습니다',
+        joinRoom: '방 참가',
+        back: '뒤로',
+        chat: '채팅',
+        chatPlaceholder: '메시지를 입력하세요...',
+        send: '보내기'
     },
     zh: {
         name: '中文',
@@ -471,7 +573,24 @@ const SYNCWATCH_LOCALES = {
         language: '语言',
         disconnected: '未连接',
         show: '显示',
-        hide: '隐藏'
+        hide: '隐藏',
+        advancedOptions: '高级选项',
+        hideOptions: '隐藏选项',
+        makePublic: '设为公开房间',
+        roomNamePlaceholder: '房间名称（可选）',
+        roomDescPlaceholder: '你在看什么？（可选）',
+        browsePublicRooms: '浏览公开房间',
+        browseRooms: '浏览公开房间',
+        allRooms: '所有房间',
+        emptyRooms: '空房间',
+        halfFull: '半满',
+        almostFull: '将满',
+        noRoomsFound: '未找到公开房间',
+        joinRoom: '加入房间',
+        back: '返回',
+        chat: '聊天',
+        chatPlaceholder: '输入消息...',
+        send: '发送'
     },
     ar: {
         name: 'العربية',
@@ -513,7 +632,24 @@ const SYNCWATCH_LOCALES = {
         language: 'اللغة',
         disconnected: 'غير متصل',
         show: 'إظهار',
-        hide: 'إخفاء'
+        hide: 'إخفاء',
+        advancedOptions: 'خيارات متقدمة',
+        hideOptions: 'إخفاء الخيارات',
+        makePublic: 'جعل الغرفة عامة',
+        roomNamePlaceholder: 'اسم الغرفة (اختياري)',
+        roomDescPlaceholder: 'ماذا تشاهد؟ (اختياري)',
+        browsePublicRooms: 'تصفح الغرف العامة',
+        browseRooms: 'تصفح الغرف العامة',
+        allRooms: 'كل الغرف',
+        emptyRooms: 'غرف فارغة',
+        halfFull: 'نصف ممتلئة',
+        almostFull: 'شبه ممتلئة',
+        noRoomsFound: 'لم يتم العثور على غرف عامة',
+        joinRoom: 'الانضمام للغرفة',
+        back: 'رجوع',
+        chat: 'دردشة',
+        chatPlaceholder: 'اكتب رسالة...',
+        send: 'إرسال'
     },
     hi: {
         name: 'हिन्दी',
@@ -555,24 +691,41 @@ const SYNCWATCH_LOCALES = {
         language: 'भाषा',
         disconnected: 'कनेक्ट नहीं',
         show: 'दिखाएं',
-        hide: 'छिपाएं'
+        hide: 'छिपाएं',
+        advancedOptions: 'उन्नत विकल्प',
+        hideOptions: 'विकल्प छिपाएं',
+        makePublic: 'रूम को सार्वजनिक करें',
+        roomNamePlaceholder: 'रूम का नाम (वैकल्पिक)',
+        roomDescPlaceholder: 'आप क्या देख रहे हैं? (वैकल्पिक)',
+        browsePublicRooms: 'सार्वजनिक रूम ब्राउज़ करें',
+        browseRooms: 'सार्वजनिक रूम ब्राउज़ करें',
+        allRooms: 'सभी रूम',
+        emptyRooms: 'खाली रूम',
+        halfFull: 'आधा भरा',
+        almostFull: 'लगभग भरा',
+        noRoomsFound: 'कोई सार्वजनिक रूम नहीं मिला',
+        joinRoom: 'रूम में शामिल हों',
+        back: 'वापस जाएं',
+        chat: 'चैट',
+        chatPlaceholder: 'संदेश लिखें...',
+        send: 'भेजें'
     }
 };
 
 // Default language
-const SYNCWATCH_DEFAULT_LANG = 'en';
+const WeWatch_DEFAULT_LANG = 'en';
 
 // Get a translation
 function t(key, lang) {
-    const locale = SYNCWATCH_LOCALES[lang] || SYNCWATCH_LOCALES[SYNCWATCH_DEFAULT_LANG];
-    return locale[key] || SYNCWATCH_LOCALES[SYNCWATCH_DEFAULT_LANG][key] || key;
+    const locale = WeWatch_LOCALES[lang] || WeWatch_LOCALES[WeWatch_DEFAULT_LANG];
+    return locale[key] || WeWatch_LOCALES[WeWatch_DEFAULT_LANG][key] || key;
 }
 
 // Get saved language or detect from browser
 function getSavedLang(callback) {
     if (typeof chrome !== 'undefined' && chrome.storage) {
-        chrome.storage.local.get(['syncwatchLang'], (result) => {
-            callback(result.syncwatchLang || detectLang());
+        chrome.storage.local.get(['WeWatchLang'], (result) => {
+            callback(result.WeWatchLang || detectLang());
         });
     } else {
         callback(detectLang());
@@ -582,11 +735,11 @@ function getSavedLang(callback) {
 function detectLang() {
     const nav = navigator.language || navigator.userLanguage || 'en';
     const short = nav.split('-')[0].toLowerCase();
-    return SYNCWATCH_LOCALES[short] ? short : SYNCWATCH_DEFAULT_LANG;
+    return WeWatch_LOCALES[short] ? short : WeWatch_DEFAULT_LANG;
 }
 
 function saveLang(lang) {
     if (typeof chrome !== 'undefined' && chrome.storage) {
-        chrome.storage.local.set({ syncwatchLang: lang });
+        chrome.storage.local.set({ WeWatchLang: lang });
     }
 }

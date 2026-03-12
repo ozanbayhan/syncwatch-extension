@@ -1,4 +1,4 @@
-// SyncWatch Popup Script — v3.0 Production
+// WeWatch Popup Script — v3.0 Production
 
 document.addEventListener('DOMContentLoaded', () => {
     // ─── Elements ─────────────────────────────────────────────
@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const viewWaiting = document.getElementById('viewWaiting');
     const viewSynced = document.getElementById('viewSynced');
     const viewBrowse = document.getElementById('viewBrowse');
+    const viewRequestPending = document.getElementById('viewRequestPending');
     const toast = document.getElementById('toast');
     const toastMessage = document.getElementById('toastMessage');
 
@@ -16,8 +17,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const roomCode = document.getElementById('roomCode');
     const btnCopy = document.getElementById('btnCopy');
     const btnLeaveWaiting = document.getElementById('btnLeaveWaiting');
+    const btnCancelRequest = document.getElementById('btnCancelRequest');
     const syncRoomId = document.getElementById('syncRoomId');
     const mediaLabel = document.getElementById('mediaLabel');
+    const mediaDuration = document.getElementById('mediaDuration');
     const btnDisconnect = document.getElementById('btnDisconnect');
 
     const presenceBar = document.getElementById('presenceBar');
@@ -41,6 +44,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterOccupancy = document.getElementById('filterOccupancy');
     const roomsList = document.getElementById('roomsList');
 
+    // Host Approval elements
+    const joinReqCountWaiting = document.getElementById('joinReqCountWaiting');
+    const requestListWaiting = document.getElementById('requestListWaiting');
+    const joinRequestsPanelWaiting = document.getElementById('joinRequestsPanelWaiting');
+
+    const joinReqCountSynced = document.getElementById('joinReqCountSynced');
+    const requestListSynced = document.getElementById('requestListSynced');
+    const joinRequestsPanelSynced = document.getElementById('joinRequestsPanelSynced');
+
     // ─── i18n ─────────────────────────────────────────────────
     let currentLang = 'en';
 
@@ -51,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function initLangSelector() {
         // Populate language dropdown
         langSelect.innerHTML = '';
-        for (const [code, locale] of Object.entries(SYNCWATCH_LOCALES)) {
+        for (const [code, locale] of Object.entries(WeWatch_LOCALES)) {
             const opt = document.createElement('option');
             opt.value = code;
             opt.textContent = `${locale.flag} ${locale.name}`;
@@ -99,6 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
         viewWaiting.classList.add('hidden');
         viewSynced.classList.add('hidden');
         viewBrowse.classList.add('hidden');
+        viewRequestPending.classList.add('hidden');
         view.classList.remove('hidden');
     }
 
@@ -115,7 +128,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!state.isConnected && !state.roomId) {
             statusDot.className = 'status-dot';
             statusDot.title = _('disconnected');
-            showView(viewDisconnected);
+            if (viewBrowse.classList.contains('hidden')) {
+                showView(viewDisconnected);
+            }
+        } else if (state.waitingForApproval) {
+            statusDot.className = 'status-dot';
+            statusDot.title = 'Waiting...';
+            showView(viewRequestPending);
         } else if (state.roomId && !state.peerConnected) {
             if (state.isHost) {
                 statusDot.className = 'status-dot connected';
@@ -153,6 +172,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        // Render Join Requests if host
+        if (state.isHost && state.joinRequests) {
+            renderJoinRequests(state.joinRequests);
+        } else {
+            joinRequestsPanelWaiting.classList.add('hidden');
+            joinRequestsPanelSynced.classList.add('hidden');
+        }
+
         if (state.error) {
             showToast(state.error, 'error');
         }
@@ -166,14 +193,37 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => toast.classList.add('hidden'), 3000);
     }
 
+    // ─── Format Time ──────────────────────────────────────────
+    function formatTime(seconds) {
+        if (!seconds || isNaN(seconds) || seconds < 0) return '00:00';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        
+        const pad = (num) => num.toString().padStart(2, '0');
+        
+        if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
+        return `${pad(m)}:${pad(s)}`;
+    }
+
     // ─── Media Status ─────────────────────────────────────────
     function checkMediaStatus() {
         chrome.storage.local.get(['mediaInfo'], (result) => {
             if (result.mediaInfo) {
                 const type = result.mediaInfo.tagName === 'VIDEO' ? _('videoDetected') : _('audioDetected');
                 mediaLabel.textContent = type;
+                
+                if (result.mediaInfo.duration > 0) {
+                    const ct = formatTime(result.mediaInfo.currentTime);
+                    const dt = formatTime(result.mediaInfo.duration);
+                    mediaDuration.textContent = `${ct} / ${dt}`;
+                    mediaDuration.style.display = 'block';
+                } else {
+                    mediaDuration.style.display = 'none';
+                }
             } else {
                 mediaLabel.textContent = _('noMedia');
+                mediaDuration.style.display = 'none';
             }
         });
     }
@@ -239,6 +289,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     btnLeaveWaiting.addEventListener('click', () => {
+        chrome.runtime.sendMessage({ type: 'leave_room' });
+    });
+
+    btnCancelRequest.addEventListener('click', () => {
         chrome.runtime.sendMessage({ type: 'leave_room' });
     });
 
@@ -326,6 +380,65 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // ─── Host Approval Handlers ───────────────────────────────
+
+    function renderJoinRequests(requests) {
+        const count = requests.length;
+
+        // Waiting View Update
+        joinReqCountWaiting.textContent = count;
+        requestListWaiting.innerHTML = '';
+        if (count > 0 && !viewWaiting.classList.contains('hidden')) {
+            joinRequestsPanelWaiting.classList.remove('hidden');
+        } else {
+            joinRequestsPanelWaiting.classList.add('hidden');
+        }
+
+        // Synced View Update
+        joinReqCountSynced.textContent = count;
+        requestListSynced.innerHTML = '';
+        if (count > 0 && !viewSynced.classList.contains('hidden')) {
+            joinRequestsPanelSynced.classList.remove('hidden');
+        } else {
+            joinRequestsPanelSynced.classList.add('hidden');
+        }
+
+        if (count === 0) return;
+
+        const html = requests.map(req => {
+            const domain = req.url ? escapeHtml(new URL(req.url).hostname) : 'Unknown site';
+            return `
+                <div class="request-item">
+                    <div class="request-info">
+                        <span class="request-name">${escapeHtml(req.username)}</span>
+                        <span class="request-site">${domain}</span>
+                    </div>
+                    <div class="request-actions">
+                        <button class="btn-req accept" data-id="${escapeHtml(req.id)}">✓</button>
+                        <button class="btn-req deny" data-id="${escapeHtml(req.id)}">✕</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        requestListWaiting.innerHTML = html;
+        requestListSynced.innerHTML = html;
+
+        document.querySelectorAll('.btn-req.accept').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.getAttribute('data-id');
+                chrome.runtime.sendMessage({ type: 'accept_join_request', requesterId: id });
+            });
+        });
+
+        document.querySelectorAll('.btn-req.deny').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.getAttribute('data-id');
+                chrome.runtime.sendMessage({ type: 'deny_join_request', requesterId: id });
+            });
+        });
+    }
+
     // ─── State Listener ───────────────────────────────────────
 
     chrome.runtime.onMessage.addListener((msg) => {
@@ -362,7 +475,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(fetchState, 1000);
     setInterval(fetchPresence, 15000);
 
+    // Update media duration much faster (every second) to seem real-time
     setInterval(() => {
         if (!viewSynced.classList.contains('hidden')) checkMediaStatus();
-    }, 3000);
+    }, 1000);
 });

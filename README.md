@@ -1,4 +1,4 @@
-# ⚡ SyncWatch
+# ⚡ WeWatch
 
 **Watch videos and listen to audio in sync with a friend — anywhere on the web.**
 
@@ -10,16 +10,16 @@
 
 - 🎬 **Real-time sync** — Play, pause, seek synchronized between two users
 - 🔗 **URL matching** — See if you and your partner are on the same page
-- 👥 **Active users** — See how many SyncWatch users are on the same page
+- 👥 **Active users** — See how many WeWatch users are on the same page
 - 🌍 **12 languages** — EN, TR, ES, FR, DE, PT, RU, JA, KO, ZH, AR, HI
 - 📌 **Draggable overlay** — Floating status widget on any page
 - ⚡ **One-click sync fix** — Instantly align playback if drift is detected
 
 ## 🚀 How to Use
 
-1. Install SyncWatch on both browsers
+1. Install WeWatch on both browsers
 2. Open the same video/audio page
-3. Click the SyncWatch icon → **Create Room**
+3. Click the WeWatch icon → **Create Room**
 4. Share the 6-digit code with your friend
 5. They click **Join** and enter the code
 6. Enjoy synchronized playback! 🎉
@@ -34,7 +34,7 @@
 1. Clone this repo
 2. Edit `config.js` with your Firebase database URL
 3. Go to `chrome://extensions` → Enable **Developer mode**
-4. Click **Load unpacked** → Select the `syncwatch-extension` folder
+4. Click **Load unpacked** → Select the `WeWatch-extension` folder
 
 ### Firebase Setup
 1. Go to [Firebase Console](https://console.firebase.google.com)
@@ -45,7 +45,7 @@
 ## 📁 Project Structure
 
 ```
-syncwatch-extension/
+WeWatch-extension/
 ├── manifest.json          # Extension manifest (MV3)
 ├── config.js              # Firebase configuration
 ├── locales.js             # 12-language i18n system
