@@ -519,11 +519,12 @@
                 break;
                 
             case 'restore_overlay':
-                if (!overlayEl) {
+                if (!overlayEl || !document.body.contains(overlayEl)) {
+                    if (overlayEl) overlayEl.remove();
+                    overlayEl = null;
                     createOverlay(false); // Re-create visible
                 } else {
-                    overlayEl.style.cssText = overlayEl.style.cssText.replace('display: none !important;', '');
-                    overlayEl.style.display = 'block';
+                    overlayEl.style.setProperty('display', 'block', 'important');
                 }
                 overlayVisible = true;
                 break;
@@ -613,13 +614,13 @@
         });
         document.body.appendChild(liveChatEl);
 
-        overlayStatus = document.getElementById('sw-status');
-        overlayDrift = document.getElementById('sw-drift');
-        overlayUrlStatus = document.getElementById('sw-url-status');
-        overlayPresence = document.getElementById('sw-presence');
-        syncBtn = document.getElementById('sw-sync-btn');
-        goToPageBtn = document.getElementById('sw-goto-btn');
-        chatToggleBtn = document.getElementById('sw-chat-toggle');
+        overlayStatus = overlayEl.querySelector('#sw-status');
+        overlayDrift = overlayEl.querySelector('#sw-drift');
+        overlayUrlStatus = overlayEl.querySelector('#sw-url-status');
+        overlayPresence = overlayEl.querySelector('#sw-presence');
+        syncBtn = overlayEl.querySelector('#sw-sync-btn');
+        goToPageBtn = overlayEl.querySelector('#sw-goto-btn');
+        chatToggleBtn = overlayEl.querySelector('#sw-chat-toggle');
 
         // Ensure events are attached to the actual overlay element directly
         overlayEl.addEventListener('click', (e) => {
@@ -627,10 +628,10 @@
                 e.preventDefault();
                 e.stopPropagation();
                 if (overlayEl) {
-                    overlayEl.style.display = 'none';
+                    overlayEl.style.setProperty('display', 'none', 'important');
                 }
                 if (chatPanelEl) {
-                    chatPanelEl.style.display = 'none';
+                    chatPanelEl.style.setProperty('display', 'none', 'important');
                 }
                 overlayVisible = false;
             }
@@ -659,11 +660,11 @@
         });
 
         // Dragging
-        const header = document.getElementById('sw-header');
+        const header = overlayEl.querySelector('#sw-header');
         
         if (header) {
             header.addEventListener('mousedown', (e) => {
-                if (e.target.id === 'sw-close') return; // Don't drag if clicking close
+                if (e.target.id === 'sw-close' || e.target.closest('#sw-close')) return; // Don't drag if clicking close
                 isDragging = true;
                 dragStartX = e.clientX;
                 dragStartY = e.clientY;
@@ -706,8 +707,10 @@
     document.addEventListener('mouseup', () => {
         if (isDragging) {
             isDragging = false;
-            const header = document.getElementById('sw-header');
-            if (header) header.style.cursor = 'grab';
+            if (overlayEl) {
+                const header = overlayEl.querySelector('#sw-header');
+                if (header) header.style.cursor = 'grab';
+            }
         }
     });
 
