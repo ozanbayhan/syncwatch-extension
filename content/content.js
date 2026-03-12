@@ -564,33 +564,35 @@
             <button id="sw-chat-toggle" style="display:none;margin-top:8px;background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:11px;width:100%;font-weight:500;">💬 <span id="sw-chat-label">Chat</span> <span id="sw-chat-badge"></span></button>
         `;
 
-        Object.assign(overlayEl.style, {
-            position: 'fixed',
-            top: '20px',
-            right: '20px',
-            width: '180px',
-            backgroundColor: 'rgba(15, 15, 23, 0.55)',
-            color: '#fff',
-            padding: '10px 12px',
-            borderRadius: '12px',
-            fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-            zIndex: '2147483647',
-            display: initiallyHidden ? 'none' : 'block',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-            transition: 'opacity 0.2s, background-color 0.2s',
-            boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
-            border: '1px solid rgba(255,255,255,0.06)',
-            opacity: '0.55'
-        });
+        const hiddenDisplay = initiallyHidden ? 'none !important' : 'block !important';
+        overlayEl.style.cssText = `
+            position: fixed !important;
+            top: 20px !important;
+            right: 20px !important;
+            width: 180px !important;
+            background-color: rgba(15, 15, 23, 0.55) !important;
+            color: #fff !important;
+            padding: 10px 12px !important;
+            border-radius: 12px !important;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+            z-index: 2147483647 !important;
+            display: ${initiallyHidden ? 'none' : 'block'} !important;
+            backdrop-filter: blur(16px) !important;
+            -webkit-backdrop-filter: blur(16px) !important;
+            transition: opacity 0.2s, background-color 0.2s !important;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.4) !important;
+            border: 1px solid rgba(255,255,255,0.06) !important;
+            opacity: 0.55 !important;
+            pointer-events: auto !important;
+        `;
 
         overlayEl.addEventListener('mouseenter', () => {
-            overlayEl.style.opacity = '1';
-            overlayEl.style.backgroundColor = 'rgba(15, 15, 23, 0.95)';
+            overlayEl.style.setProperty('opacity', '1', 'important');
+            overlayEl.style.setProperty('background-color', 'rgba(15, 15, 23, 0.95)', 'important');
         });
         overlayEl.addEventListener('mouseleave', () => {
-            overlayEl.style.opacity = '0.55';
-            overlayEl.style.backgroundColor = 'rgba(15, 15, 23, 0.55)';
+            overlayEl.style.setProperty('opacity', '0.55', 'important');
+            overlayEl.style.setProperty('background-color', 'rgba(15, 15, 23, 0.55)', 'important');
         });
 
         document.body.appendChild(overlayEl);
@@ -621,10 +623,11 @@
         syncBtn = overlayEl.querySelector('#sw-sync-btn');
         goToPageBtn = overlayEl.querySelector('#sw-goto-btn');
         chatToggleBtn = overlayEl.querySelector('#sw-chat-toggle');
+        const closeBtn = overlayEl.querySelector('#sw-close');
 
-        // Ensure events are attached to the actual overlay element directly
-        overlayEl.addEventListener('click', (e) => {
-            if (e.target.id === 'sw-close' || e.target.closest('#sw-close')) {
+        // Close button
+        if (closeBtn) {
+            closeBtn.onclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 if (overlayEl) {
@@ -634,8 +637,8 @@
                     chatPanelEl.style.setProperty('display', 'none', 'important');
                 }
                 overlayVisible = false;
-            }
-        });
+            };
+        }
 
 
         // Sync button
@@ -663,8 +666,8 @@
         const header = overlayEl.querySelector('#sw-header');
         
         if (header) {
-            header.addEventListener('mousedown', (e) => {
-                if (e.target.id === 'sw-close' || e.target.closest('#sw-close')) return; // Don't drag if clicking close
+            header.onmousedown = (e) => {
+                if (e.target.id === 'sw-close' || e.target.closest('#sw-close')) return;
                 isDragging = true;
                 dragStartX = e.clientX;
                 dragStartY = e.clientY;
@@ -672,15 +675,14 @@
                 dragInitialLeft = rect.left;
                 dragInitialTop = rect.top;
                 
-                // Switch from right-based to left-based positioning for dragging
-                overlayEl.style.right = 'auto';
-                overlayEl.style.bottom = 'auto';
-                overlayEl.style.left = dragInitialLeft + 'px';
-                overlayEl.style.top = dragInitialTop + 'px';
+                overlayEl.style.setProperty('right', 'auto', 'important');
+                overlayEl.style.setProperty('bottom', 'auto', 'important');
+                overlayEl.style.setProperty('left', dragInitialLeft + 'px', 'important');
+                overlayEl.style.setProperty('top', dragInitialTop + 'px', 'important');
                 
                 header.style.cursor = 'grabbing';
                 e.preventDefault();
-            });
+            };
         }
 
         // We now handle mousemove/mouseup globally below outside createOverlay 
@@ -700,8 +702,8 @@
         if (!isDragging || !overlayEl) return;
         const deltaX = e.clientX - dragStartX;
         const deltaY = e.clientY - dragStartY;
-        overlayEl.style.left = (dragInitialLeft + deltaX) + 'px';
-        overlayEl.style.top = (dragInitialTop + deltaY) + 'px';
+        overlayEl.style.setProperty('left', (dragInitialLeft + deltaX) + 'px', 'important');
+        overlayEl.style.setProperty('top', (dragInitialTop + deltaY) + 'px', 'important');
     });
 
     document.addEventListener('mouseup', () => {
