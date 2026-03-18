@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "WeWatch",
-  "version": "3.0.0",
+  "version": "1.0.0",
   "description": "Watch videos and listen to audio in sync with a friend",
   "permissions": [
     "activeTab",
@@ -10,7 +10,8 @@
   ],
   "host_permissions": [
     "https://*.firebaseio.com/*",
-    "https://*.firebasedatabase.app/*"
+    "https://*.firebasedatabase.app/*",
+    "https://www.googleapis.com/*"
   ],
   "action": {
     "default_popup": "popup/popup.html",

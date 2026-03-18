@@ -1,0 +1,40 @@
+{
+  "rules": {
+    "rooms": {
+      "$roomId": {
+        ".read": true,
+        ".write": true,
+        "messages": {
+          "$msgId": {
+            ".validate": "newData.hasChildren(['text', 'sender', 'timestamp']) && newData.child('text').isString() && newData.child('text').val().length <= 500"
+          }
+        }
+      }
+    },
+    "signals": {
+      "$peerId": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.hasChildren(['type', 'roomId'])"
+      }
+    },
+    "presence": {
+      "$pageKey": {
+        "$peerId": {
+          ".read": true,
+          ".write": true,
+          ".validate": "newData.hasChildren(['lastSeen']) && newData.child('lastSeen').isNumber()"
+        }
+      }
+    },
+    "matchRequests": {
+      "$targetPeerId": {
+        "$senderPeerId": {
+          ".read": true,
+          ".write": true,
+          ".validate": "newData.hasChildren(['from', 'timestamp']) && newData.child('timestamp').isNumber()"
+        }
+      }
+    }
+  }
+}

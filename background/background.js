@@ -3,10 +3,14 @@
 
 // ─── Config ───────────────────────────────────────────────
 let FIREBASE_DB_URL = '';
+let YT_API_KEY = '';
 
 try {
     importScripts('../config.js');
     FIREBASE_DB_URL = FIREBASE_CONFIG.databaseURL.replace(/\/$/, '');
+    if (typeof YOUTUBE_API_KEY !== 'undefined' && YOUTUBE_API_KEY !== 'YOUR_YOUTUBE_API_KEY_HERE') {
+        YT_API_KEY = YOUTUBE_API_KEY;
+    }
 } catch (e) {
     console.error('[WeWatch] Failed to load config.js');
 }
@@ -535,19 +539,23 @@ async function getChatMessages(sinceTimestamp = 0) {
 let presenceInterval = null;
 let currentPresenceKey = null;
 
-async function updatePresence(url) {
+async function updatePresence(url, title) {
     if (!url) return;
     const key = urlToFirebaseKey(url);
     if (!key) return;
-    const { peerId } = await chrome.storage.local.get('peerId');
+    const { peerId, openToMatch } = await chrome.storage.local.get(['peerId', 'openToMatch']);
 
     if (currentPresenceKey && currentPresenceKey !== key) {
         firebase('DELETE', `presence/${currentPresenceKey}/${peerId}`).catch(() => {});
     }
     currentPresenceKey = key;
 
+    const presenceData = { lastSeen: Date.now(), url: url };
+    if (title) presenceData.title = String(title).slice(0, 200);
+    if (openToMatch) presenceData.openToMatch = true;
+
     await firebase('PATCH', `presence/${key}`, {
-        [peerId]: { lastSeen: Date.now() }
+        [peerId]: presenceData
     });
 }
 
@@ -575,6 +583,77 @@ async function getPresenceCount(url) {
         }
     }
     return count;
+}
+
+async function getTrendingPages() {
+    const data = await firebase('GET', 'presence');
+    if (!data || typeof data !== 'object') return [];
+
+    const now = Date.now();
+    const pageMap = {}; // url -> { count, title, url }
+
+    for (const [key, users] of Object.entries(data)) {
+        if (!users || typeof users !== 'object') continue;
+
+        let pageUrl = null;
+        let pageTitle = null;
+        let activeCount = 0;
+
+        for (const [pid, info] of Object.entries(users)) {
+            if (!info || typeof info.lastSeen !== 'number') continue;
+            if ((now - info.lastSeen) > PRESENCE_TTL_MS) {
+                firebase('DELETE', `presence/${key}/${pid}`).catch(() => {});
+                continue;
+            }
+            activeCount++;
+            if (!pageUrl && info.url) pageUrl = info.url;
+            if (!pageTitle && info.title) pageTitle = info.title;
+        }
+
+        if (activeCount >= 2 && pageUrl) {
+            // Extract domain for display
+            let domain = 'unknown';
+            try {
+                domain = new URL(pageUrl).hostname.replace('www.', '');
+            } catch (e) {}
+
+            pageMap[key] = {
+                url: pageUrl,
+                title: pageTitle || domain,
+                domain: domain,
+                count: activeCount
+            };
+        }
+    }
+
+    // Sort by count descending, return top 20
+    return Object.values(pageMap)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 20);
+}
+
+async function getMatchableUsers(url) {
+    if (!url) return [];
+    const key = urlToFirebaseKey(url);
+    if (!key) return [];
+    const { peerId } = await chrome.storage.local.get('peerId');
+    const data = await firebase('GET', `presence/${key}`);
+    if (!data || typeof data !== 'object') return [];
+
+    const now = Date.now();
+    const users = [];
+    for (const [pid, info] of Object.entries(data)) {
+        if (pid === peerId) continue;
+        if (!info || typeof info.lastSeen !== 'number') continue;
+        if ((now - info.lastSeen) > PRESENCE_TTL_MS) continue;
+        if (!info.openToMatch) continue;
+        users.push({
+            peerId: pid,
+            url: info.url || url,
+            title: info.title || 'Unknown'
+        });
+    }
+    return users;
 }
 
 function startPresenceHeartbeat(url) {
@@ -868,8 +947,211 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         case 'ping':
             sendResponse({ pong: true });
             return true;
+
+        case 'get_trending':
+            getTrendingPages()
+                .then(pages => sendResponse({ pages }))
+                .catch(() => sendResponse({ pages: [] }));
+            return true;
+
+        case 'update_page_title':
+            if (msg.title && msg.url) {
+                chrome.storage.local.set({ pageTitle: String(msg.title).slice(0, 200) });
+            }
+            sendResponse({ ok: true });
+            return true;
+
+        case 'get_youtube_live':
+            getYouTubeLive(msg.query || '')
+                .then(result => sendResponse(result))
+                .catch(err => sendResponse({ videos: [], error: err.message }));
+            return true;
+
+        case 'set_matchmaking':
+            chrome.storage.local.set({ openToMatch: !!msg.enabled }, () => {
+                // Force presence update
+                chrome.tabs.query({ active: true, lastFocusedWindow: true }, ([tab]) => {
+                    if (tab && tab.url) {
+                        updatePresence(normalizeUrl(tab.url), null);
+                    }
+                });
+                sendResponse({ ok: true });
+            });
+            return true;
+
+        case 'get_matchable_users':
+            if (msg.url) {
+                getMatchableUsers(normalizeUrl(msg.url))
+                    .then(users => sendResponse({ users }))
+                    .catch(() => sendResponse({ users: [] }));
+            } else {
+                sendResponse({ users: [] });
+            }
+            return true;
+
+        case 'send_match_request':
+            // Store request in Firebase for the target peer to discover
+            (async () => {
+                try {
+                    const { peerId } = await chrome.storage.local.get('peerId');
+                    await firebase('PUT', `matchRequests/${msg.targetPeerId}/${peerId}`, {
+                        from: peerId,
+                        url: msg.url || '',
+                        title: msg.title || '',
+                        timestamp: Date.now()
+                    });
+                    sendResponse({ ok: true });
+                } catch (e) {
+                    sendResponse({ ok: false, error: e.message });
+                }
+            })();
+            return true;
+
+        case 'get_match_requests':
+            // Check if anyone wants to match with me
+            (async () => {
+                try {
+                    const { peerId } = await chrome.storage.local.get('peerId');
+                    const requests = await firebase('GET', `matchRequests/${peerId}`);
+                    if (!requests || typeof requests !== 'object') {
+                        sendResponse({ requests: [] });
+                        return;
+                    }
+                    const now = Date.now();
+                    const valid = Object.entries(requests)
+                        .filter(([, r]) => r && (now - r.timestamp) < 60000) // 60s TTL
+                        .map(([fromId, r]) => ({
+                            fromPeerId: fromId,
+                            url: r.url || '',
+                            title: r.title || 'Unknown',
+                            timestamp: r.timestamp
+                        }));
+                    sendResponse({ requests: valid });
+                } catch (e) {
+                    sendResponse({ requests: [] });
+                }
+            })();
+            return true;
+
+        case 'accept_match':
+            // Accept match request → create room
+            (async () => {
+                try {
+                    const roomId = generateRoomId();
+                    const { peerId } = await chrome.storage.local.get('peerId');
+                    // Clean up the match request
+                    await firebase('DELETE', `matchRequests/${peerId}/${msg.fromPeerId}`);
+                    // Create room
+                    await firebase('PUT', `rooms/${roomId}`, {
+                        host: peerId,
+                        peer: msg.fromPeerId,
+                        createdAt: Date.now(),
+                        isPublic: false
+                    });
+                    await chrome.storage.local.set({
+                        roomId,
+                        isHost: true,
+                        isConnected: true,
+                        peerConnected: true,
+                        openToMatch: false
+                    });
+                    broadcastState();
+                    sendResponse({ ok: true, roomId });
+                } catch (e) {
+                    sendResponse({ ok: false, error: e.message });
+                }
+            })();
+            return true;
+
+        case 'decline_match':
+            // Remove the match request
+            (async () => {
+                try {
+                    const { peerId } = await chrome.storage.local.get('peerId');
+                    await firebase('DELETE', `matchRequests/${peerId}/${msg.fromPeerId}`);
+                    sendResponse({ ok: true });
+                } catch (e) {
+                    sendResponse({ ok: false });
+                }
+            })();
+            return true;
     }
 });
+
+// ─── YouTube Live API ─────────────────────────────────────
+
+async function getYouTubeLive(query) {
+    if (!YT_API_KEY) return { videos: [], error: 'API key not configured' };
+
+    try {
+        const params = new URLSearchParams({
+            part: 'snippet',
+            type: 'video',
+            eventType: 'live',
+            order: 'viewCount',
+            maxResults: '15',
+            key: YT_API_KEY,
+            relevanceLanguage: 'tr',
+            q: query || 'live'
+        });
+
+        const searchRes = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`, {
+            cache: 'no-store'
+        });
+        
+        if (!searchRes.ok) {
+            const errBody = await searchRes.json().catch(() => ({}));
+            const errMsg = errBody?.error?.message || `HTTP ${searchRes.status}`;
+            console.warn('[WeWatch] YouTube API error:', errMsg);
+            return { videos: [], error: errMsg };
+        }
+        
+        const searchData = await searchRes.json();
+
+        if (!searchData.items || searchData.items.length === 0) {
+            return { videos: [], error: null };
+        }
+
+        // Get video details (view counts)
+        const videoIds = searchData.items.map(item => item.id.videoId).join(',');
+        const detailsRes = await fetch(
+            `https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails,statistics&id=${videoIds}&key=${YT_API_KEY}`,
+            { cache: 'no-store' }
+        );
+        
+        let detailsMap = {};
+        if (detailsRes.ok) {
+            const detailsData = await detailsRes.json();
+            if (detailsData.items) {
+                detailsData.items.forEach(item => {
+                    detailsMap[item.id] = {
+                        viewers: item.liveStreamingDetails?.concurrentViewers || '0',
+                        viewCount: item.statistics?.viewCount || '0'
+                    };
+                });
+            }
+        }
+
+        const videos = searchData.items.map(item => {
+            const videoId = item.id.videoId;
+            const details = detailsMap[videoId] || {};
+            return {
+                videoId,
+                title: item.snippet.title,
+                channel: item.snippet.channelTitle,
+                thumbnail: item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url,
+                viewers: parseInt(details.viewers || '0'),
+                url: `https://www.youtube.com/watch?v=${videoId}`
+            };
+        }).sort((a, b) => b.viewers - a.viewers);
+
+        return { videos, error: null };
+
+    } catch (err) {
+        console.warn('[WeWatch] YouTube API error:', err.message);
+        return { videos: [], error: err.message };
+    }
+}
 
 // ─── Tab Events ───────────────────────────────────────────
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {

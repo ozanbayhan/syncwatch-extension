@@ -14,17 +14,11 @@
     <!-- Header -->
     <div class="header">
       <div class="logo">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="10" stroke="url(#grad)" stroke-width="2"/>
-          <path d="M10 8L16 12L10 16V8Z" fill="url(#grad)"/>
-          <defs>
-            <linearGradient id="grad" x1="2" y1="2" x2="22" y2="22">
-              <stop stop-color="#A78BFA"/>
-              <stop offset="1" stop-color="#6366F1"/>
-            </linearGradient>
-          </defs>
-        </svg>
-        <span class="logo-text">WeWatch</span>
+        <div class="logo-icon-wrap">
+          <img src="../icons/wewatch-logo.png" alt="WeWatch" class="logo-img">
+          <span class="logo-orbit-dot"></span>
+        </div>
+        <span class="logo-text">We<span class="logo-accent">Watch</span></span>
       </div>
       <div class="header-right">
         <select id="langSelect" class="lang-select" title="Language"></select>
@@ -41,8 +35,8 @@
     <!-- Not Connected View -->
     <div id="viewDisconnected" class="view">
       <div class="hero">
-        <p class="hero-text" data-i18n="watchTogether">Watch together, anywhere.</p>
-        <p class="hero-sub" data-i18n="heroSub">Create a room or join with a code to sync your media playback.</p>
+        <p class="hero-text" data-i18n="watchTogether">Birlikte izle, <span class="logo-accent">her yerde.</span></p>
+        <p class="hero-sub" data-i18n="heroSub">Oda kur. Kod paylaş. Senkronize izle.</p>
       </div>
 
       <!-- Advanced Options Toggle -->
@@ -93,6 +87,21 @@
       </div>
 
       <button class="btn btn-secondary" id="btnBrowse" data-i18n="browsePublicRooms">Browse Public Rooms</button>
+
+      <button class="btn btn-trending" id="btnTrending">
+        <span>🔥</span>
+        <span data-i18n="trending">Trending Now</span>
+      </button>
+
+      <!-- Matchmaking -->
+      <div class="match-section">
+        <label class="match-toggle">
+          <input type="checkbox" id="matchToggle">
+          <span class="match-slider"></span>
+          <span class="match-label">🤝 Open to Match</span>
+        </label>
+        <div id="matchableUsers" class="matchable-users hidden"></div>
+      </div>
     </div>
 
     <!-- Browse Public Rooms View -->
@@ -113,6 +122,44 @@
       </div>
 
       <button class="btn btn-secondary" id="btnBackFromBrowse" data-i18n="back">Back</button>
+    </div>
+
+    <!-- Trending View -->
+    <div id="viewTrending" class="view hidden">
+      <!-- Tab Buttons -->
+      <div class="trending-tabs">
+        <button class="trending-tab active" id="tabWeWatch">🔥 WeWatch</button>
+        <button class="trending-tab" id="tabYouTube">🔴 YouTube</button>
+      </div>
+
+      <!-- WeWatch Tab Content -->
+      <div id="panelWeWatch" class="trending-panel">
+        <p class="trending-sub">Pages with 2+ active WeWatch users</p>
+        <div id="trendingList" class="trending-list">
+          <div class="trending-loading">
+            <span class="pulse">Scanning pages...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- YouTube Tab Content -->
+      <div id="panelYouTube" class="trending-panel hidden">
+        <div class="yt-category-filters" id="ytCategoryFilters">
+          <button class="yt-cat-btn active" data-cat="">All</button>
+          <button class="yt-cat-btn" data-cat="sport">⚽ Sport</button>
+          <button class="yt-cat-btn" data-cat="music">🎵 Music</button>
+          <button class="yt-cat-btn" data-cat="gaming">🎮 Gaming</button>
+          <button class="yt-cat-btn" data-cat="news">📰 News</button>
+          <button class="yt-cat-btn" data-cat="entertainment">🎬 Show</button>
+        </div>
+        <div id="ytLiveList" class="trending-list">
+          <div class="trending-loading">
+            <span class="pulse">Loading live streams...</span>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-secondary" id="btnBackFromTrending" data-i18n="back">Back</button>
     </div>
 
     <!-- Request Pending View -->

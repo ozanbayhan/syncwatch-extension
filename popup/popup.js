@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const viewSynced = document.getElementById('viewSynced');
     const viewBrowse = document.getElementById('viewBrowse');
     const viewRequestPending = document.getElementById('viewRequestPending');
+    const viewTrending = document.getElementById('viewTrending');
     const toast = document.getElementById('toast');
     const toastMessage = document.getElementById('toastMessage');
 
@@ -43,6 +44,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnBackFromBrowse = document.getElementById('btnBackFromBrowse');
     const filterOccupancy = document.getElementById('filterOccupancy');
     const roomsList = document.getElementById('roomsList');
+
+    // Trending elements
+    const btnTrending = document.getElementById('btnTrending');
+    const btnBackFromTrending = document.getElementById('btnBackFromTrending');
+    const trendingList = document.getElementById('trendingList');
+    const ytLiveList = document.getElementById('ytLiveList');
+    const ytCategoryFilters = document.getElementById('ytCategoryFilters');
+
+    // Trending tab elements
+    const tabWeWatch = document.getElementById('tabWeWatch');
+    const tabYouTube = document.getElementById('tabYouTube');
+    const panelWeWatch = document.getElementById('panelWeWatch');
+    const panelYouTube = document.getElementById('panelYouTube');
+    let ytLoaded = false;
+
+    // Matchmaking elements
+    const matchToggle = document.getElementById('matchToggle');
+    const matchableUsers = document.getElementById('matchableUsers');
 
     // Host Approval elements
     const joinReqCountWaiting = document.getElementById('joinReqCountWaiting');
@@ -112,6 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
         viewSynced.classList.add('hidden');
         viewBrowse.classList.add('hidden');
         viewRequestPending.classList.add('hidden');
+        viewTrending.classList.add('hidden');
         view.classList.remove('hidden');
     }
 
@@ -128,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!state.isConnected && !state.roomId) {
             statusDot.className = 'status-dot';
             statusDot.title = _('disconnected');
-            if (viewBrowse.classList.contains('hidden')) {
+            if (viewBrowse.classList.contains('hidden') && viewTrending.classList.contains('hidden')) {
                 showView(viewDisconnected);
             }
         } else if (state.waitingForApproval) {
@@ -314,6 +334,196 @@ document.addEventListener('DOMContentLoaded', () => {
         showView(viewDisconnected);
     });
 
+    // Trending view handlers
+    btnTrending.addEventListener('click', () => {
+        showView(viewTrending);
+        loadTrending();
+    });
+
+    btnBackFromTrending.addEventListener('click', () => {
+        showView(viewDisconnected);
+    });
+
+    // Trending tab switching
+    if (tabWeWatch && tabYouTube) {
+        tabWeWatch.addEventListener('click', () => {
+            tabWeWatch.classList.add('active');
+            tabYouTube.classList.remove('active');
+            panelWeWatch.classList.remove('hidden');
+            panelYouTube.classList.add('hidden');
+        });
+
+        tabYouTube.addEventListener('click', () => {
+            tabYouTube.classList.add('active');
+            tabWeWatch.classList.remove('active');
+            panelYouTube.classList.remove('hidden');
+            panelWeWatch.classList.add('hidden');
+            if (!ytLoaded) {
+                ytLoaded = true;
+                loadYouTubeLive('');
+            }
+        });
+    }
+
+    // YouTube category filter handlers
+    if (ytCategoryFilters) {
+        ytCategoryFilters.addEventListener('click', (e) => {
+            const btn = e.target.closest('.yt-cat-btn');
+            if (!btn) return;
+            ytCategoryFilters.querySelectorAll('.yt-cat-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            loadYouTubeLive(btn.dataset.cat || '');
+        });
+    }
+
+    // Matchmaking handlers
+    if (matchToggle) {
+        // Load saved state
+        chrome.storage.local.get(['openToMatch'], (result) => {
+            matchToggle.checked = !!result.openToMatch;
+            if (result.openToMatch) fetchMatchableUsers();
+        });
+
+        matchToggle.addEventListener('change', () => {
+            const enabled = matchToggle.checked;
+            chrome.runtime.sendMessage({ type: 'set_matchmaking', enabled }, () => {
+                if (enabled) fetchMatchableUsers();
+                else matchableUsers.classList.add('hidden');
+            });
+        });
+    }
+
+    function fetchMatchableUsers() {
+        if (!matchToggle || !matchToggle.checked) return;
+        chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+            if (!tab || !tab.url) return;
+            const currentUrl = tab.url;
+            const currentTitle = tab.title || '';
+
+            chrome.runtime.sendMessage({ type: 'get_matchable_users', url: currentUrl }, (response) => {
+                if (chrome.runtime.lastError) return;
+
+                // Also check incoming requests
+                checkIncomingRequests();
+
+                if (!response || !response.users || response.users.length === 0) {
+                    matchableUsers.innerHTML = '<div class="match-empty">No users to match on this page yet...</div>';
+                    matchableUsers.classList.remove('hidden');
+                    return;
+                }
+                matchableUsers.classList.remove('hidden');
+
+                // Build HTML for matchable users + incoming requests section
+                let html = response.users.map(user => `
+                    <div class="match-user">
+                        <div class="match-user-info">
+                            <span class="match-user-dot"></span>
+                            <span class="match-user-title">${escapeHtml(user.title)}</span>
+                        </div>
+                        <button class="btn-match" data-peer="${escapeHtml(user.peerId)}"
+                                data-url="${escapeHtml(currentUrl)}"
+                                data-title="${escapeHtml(currentTitle)}">🤝 Match</button>
+                    </div>
+                `).join('');
+
+                matchableUsers.innerHTML = html;
+
+                document.querySelectorAll('.btn-match').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        btn.disabled = true;
+                        btn.textContent = 'Sent ✓';
+                        chrome.runtime.sendMessage({
+                            type: 'send_match_request',
+                            targetPeerId: btn.dataset.peer,
+                            url: btn.dataset.url,
+                            title: btn.dataset.title
+                        }, (res) => {
+                            if (res && res.ok) {
+                                showToast('Match request sent! Waiting for approval...', 'success');
+                            } else {
+                                showToast('Could not send request', 'error');
+                                btn.disabled = false;
+                                btn.textContent = '🤝 Match';
+                            }
+                        });
+                    });
+                });
+            });
+        });
+    }
+
+    function checkIncomingRequests() {
+        chrome.runtime.sendMessage({ type: 'get_match_requests' }, (response) => {
+            if (chrome.runtime.lastError || !response || !response.requests || response.requests.length === 0) return;
+
+            const incomingDiv = document.getElementById('incomingRequests') || (() => {
+                const div = document.createElement('div');
+                div.id = 'incomingRequests';
+                div.className = 'incoming-requests';
+                matchableUsers.parentElement.appendChild(div);
+                return div;
+            })();
+
+            incomingDiv.innerHTML = '<div class="incoming-header">📩 Match Requests</div>' +
+                response.requests.map(req => `
+                    <div class="match-request">
+                        <div class="match-user-info">
+                            <span class="match-user-dot" style="background:#f59e0b"></span>
+                            <span class="match-user-title">${escapeHtml(req.title || 'Someone')} wants to watch together</span>
+                        </div>
+                        <div class="match-actions">
+                            <button class="btn-accept" data-from="${escapeHtml(req.fromPeerId)}">✓</button>
+                            <button class="btn-decline" data-from="${escapeHtml(req.fromPeerId)}">✕</button>
+                        </div>
+                    </div>
+                `).join('');
+
+            incomingDiv.querySelectorAll('.btn-accept').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    btn.disabled = true;
+                    chrome.runtime.sendMessage({
+                        type: 'accept_match',
+                        fromPeerId: btn.dataset.from
+                    }, (res) => {
+                        if (res && res.ok) {
+                            showToast('Matched! Room created 🎉', 'success');
+                        } else {
+                            showToast('Match failed', 'error');
+                        }
+                    });
+                });
+            });
+
+            incomingDiv.querySelectorAll('.btn-decline').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    btn.closest('.match-request').remove();
+                    chrome.runtime.sendMessage({
+                        type: 'decline_match',
+                        fromPeerId: btn.dataset.from
+                    });
+                });
+            });
+        });
+    }
+
+    // Poll for incoming match requests every 3 seconds
+    let matchPollInterval = null;
+    if (matchToggle) {
+        matchToggle.addEventListener('change', () => {
+            if (matchToggle.checked) {
+                matchPollInterval = setInterval(checkIncomingRequests, 3000);
+            } else {
+                clearInterval(matchPollInterval);
+                const inc = document.getElementById('incomingRequests');
+                if (inc) inc.remove();
+            }
+        });
+        // Start polling if already enabled
+        if (matchToggle.checked) {
+            matchPollInterval = setInterval(checkIncomingRequests, 3000);
+        }
+    }
+
     filterOccupancy.addEventListener('change', loadPublicRooms);
 
     function escapeHtml(text) {
@@ -375,6 +585,97 @@ document.addEventListener('DOMContentLoaded', () => {
                             showToast(res.error || 'Failed to join', 'error');
                         }
                     });
+                });
+            });
+        });
+    }
+
+    // ─── Trending ─────────────────────────────────────────────
+
+    function loadTrending() {
+        trendingList.innerHTML = '<div class="trending-loading"><span class="pulse">Scanning pages...</span></div>';
+
+        chrome.runtime.sendMessage({ type: 'get_trending' }, (response) => {
+            if (!response || !response.pages || response.pages.length === 0) {
+                trendingList.innerHTML = '<div class="trending-empty">No trending pages right now.<br>Pages appear when 2+ users are watching.</div>';
+                return;
+            }
+
+            trendingList.innerHTML = response.pages.map((page, index) => {
+                const rank = index + 1;
+                const rankClass = rank <= 3 ? 'top3' : '';
+                return `
+                    <div class="trending-item" data-url="${escapeHtml(page.url)}" title="${escapeHtml(page.url)}">
+                        <span class="trending-rank ${rankClass}">${rank}</span>
+                        <div class="trending-info">
+                            <span class="trending-title">${escapeHtml(page.title)}</span>
+                            <span class="trending-domain">🌐 ${escapeHtml(page.domain)}</span>
+                        </div>
+                        <span class="trending-count">👥 ${page.count}</span>
+                    </div>
+                `;
+            }).join('');
+
+            // Click to navigate
+            document.querySelectorAll('.trending-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const url = item.getAttribute('data-url');
+                    if (url) {
+                        chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+                            if (tab) chrome.tabs.update(tab.id, { url });
+                        });
+                    }
+                });
+            });
+        });
+    }
+
+    // ─── YouTube Live ─────────────────────────────────────────
+
+    function formatViewers(n) {
+        if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+        if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+        return String(n);
+    }
+
+    function loadYouTubeLive(query) {
+        if (!ytLiveList) return;
+        ytLiveList.innerHTML = '<div class="trending-loading"><span class="pulse">Loading live streams...</span></div>';
+
+        chrome.runtime.sendMessage({ type: 'get_youtube_live', query: query || '' }, (response) => {
+            if (chrome.runtime.lastError) {
+                ytLiveList.innerHTML = `<div class="trending-empty">Connection error</div>`;
+                return;
+            }
+            if (!response || !response.videos || response.videos.length === 0) {
+                const errMsg = response?.error || 'No live streams found';
+                ytLiveList.innerHTML = `<div class="trending-empty">${escapeHtml(errMsg)}</div>`;
+                return;
+            }
+
+            ytLiveList.innerHTML = response.videos.map(video => `
+                <div class="yt-live-item" data-url="${escapeHtml(video.url)}" title="${escapeHtml(video.title)}">
+                    <img class="yt-thumb" src="${escapeHtml(video.thumbnail)}" alt="">
+                    <div class="trending-info">
+                        <span class="trending-title">${escapeHtml(video.title)}</span>
+                        <span class="trending-domain">${escapeHtml(video.channel)}</span>
+                    </div>
+                    <span class="yt-viewers">
+                        <span class="yt-live-dot"></span>
+                        ${formatViewers(video.viewers)}
+                    </span>
+                </div>
+            `).join('');
+
+            // Click to navigate
+            document.querySelectorAll('.yt-live-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const url = item.getAttribute('data-url');
+                    if (url) {
+                        chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+                            if (tab) chrome.tabs.update(tab.id, { url });
+                        });
+                    }
                 });
             });
         });

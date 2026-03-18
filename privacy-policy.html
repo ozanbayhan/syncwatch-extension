@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WeWatch - Privacy Policy</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0f;
+      color: #e4e4eb;
+      line-height: 1.7;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #34d399, #10b981);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .subtitle { color: #71717a; font-size: 14px; margin-bottom: 32px; }
+    h2 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #a5b4fc;
+      margin-top: 28px;
+      margin-bottom: 12px;
+    }
+    p { margin-bottom: 12px; color: #a1a1aa; font-size: 15px; }
+    ul { padding-left: 24px; margin-bottom: 12px; }
+    li { color: #a1a1aa; font-size: 15px; margin-bottom: 6px; }
+    strong { color: #e4e4eb; }
+    .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.06); color: #52525b; font-size: 13px; }
+    a { color: #34d399; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>WeWatch Privacy Policy</h1>
+    <p class="subtitle">Last updated: March 18, 2025</p>
+
+    <h2>1. What is WeWatch?</h2>
+    <p>WeWatch is a Chrome browser extension that allows users to watch videos and listen to audio in sync with friends. It enables real-time media synchronization, room creation, and trending discovery.</p>
+
+    <h2>2. Data We Collect</h2>
+    <p>WeWatch collects the following data solely for app functionality:</p>
+    <ul>
+      <li><strong>Page URL & Title:</strong> The URL and title of the page you are currently viewing. This is used to power the "Trending" feature and matchmaking, showing which pages have active WeWatch users.</li>
+      <li><strong>Anonymous Peer ID:</strong> A randomly generated unique identifier (UUID) stored locally on your device. This is NOT linked to your real identity, email, or any personal information.</li>
+      <li><strong>Room & Chat Data:</strong> Room codes, media playback state (play/pause/seek), and chat messages sent within a WeWatch session.</li>
+      <li><strong>Matchmaking Status:</strong> Whether you have opted in to the "Open to Match" feature.</li>
+    </ul>
+
+    <h2>3. How We Use Your Data</h2>
+    <ul>
+      <li><strong>Media Synchronization:</strong> Playback events (play, pause, seek) are shared between connected peers to keep video/audio in sync.</li>
+      <li><strong>Trending Pages:</strong> Page URLs are aggregated anonymously to show which pages are popular among WeWatch users.</li>
+      <li><strong>Matchmaking:</strong> Your page URL and "open to match" status are shared to help you find other users to watch with.</li>
+      <li><strong>Chat:</strong> Messages are stored temporarily in the room and are automatically deleted when the session ends.</li>
+    </ul>
+
+    <h2>4. Data Storage & Retention</h2>
+    <ul>
+      <li>All data is stored on <strong>Firebase Realtime Database</strong> (Google Cloud infrastructure).</li>
+      <li><strong>Presence data</strong> (URL, status) is ephemeral with a 2-minute TTL — it is automatically cleaned up when you leave.</li>
+      <li><strong>Chat messages</strong> are tied to a room session and are not permanently stored.</li>
+      <li><strong>Match requests</strong> expire after 60 seconds.</li>
+      <li>No data is stored on any private server.</li>
+    </ul>
+
+    <h2>5. Data We Do NOT Collect</h2>
+    <ul>
+      <li>We do <strong>not</strong> collect your name, email, phone number, or any personal contact information.</li>
+      <li>We do <strong>not</strong> collect passwords or financial information.</li>
+      <li>We do <strong>not</strong> read the content of web pages you visit.</li>
+      <li>We do <strong>not</strong> track your browsing history beyond the currently active page.</li>
+      <li>We do <strong>not</strong> record or store IP addresses.</li>
+    </ul>
+
+    <h2>6. Third-Party Sharing</h2>
+    <p>We do <strong>not</strong> sell, trade, or share your data with any third parties. Data is only used within the WeWatch extension for the features described above.</p>
+
+    <h2>7. YouTube API</h2>
+    <p>WeWatch uses the YouTube Data API v3 to display trending live streams. This feature only fetches publicly available data from YouTube and does not access your YouTube account or watch history. By using this feature, you are also subject to <a href="https://www.youtube.com/t/terms" target="_blank">YouTube's Terms of Service</a> and <a href="https://policies.google.com/privacy" target="_blank">Google's Privacy Policy</a>.</p>
+
+    <h2>8. Permissions Explained</h2>
+    <ul>
+      <li><strong>activeTab:</strong> To detect media elements (video/audio) on the current page for synchronization.</li>
+      <li><strong>storage:</strong> To save your preferences and anonymous peer ID locally.</li>
+      <li><strong>tabs:</strong> To access the current tab URL for trending and matchmaking features.</li>
+      <li><strong>Host permissions (Firebase, YouTube API):</strong> To communicate with our database and fetch YouTube live stream data.</li>
+    </ul>
+
+    <h2>9. Your Choices</h2>
+    <ul>
+      <li>You can <strong>disable matchmaking</strong> at any time by toggling off "Open to Match".</li>
+      <li>You can <strong>uninstall the extension</strong> at any time, which removes all locally stored data.</li>
+      <li>Your presence data is <strong>automatically removed</strong> when you close the page or go offline.</li>
+    </ul>
+
+    <h2>10. Changes to This Policy</h2>
+    <p>We may update this policy from time to time. Any changes will be reflected in the "Last updated" date above.</p>
+
+    <h2>11. Contact</h2>
+    <p>If you have questions about this privacy policy, please contact us at:<br>
+    <strong>ozanbayhan@gmail.com</strong></p>
+
+    <div class="footer">
+      © 2025 WeWatch. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>

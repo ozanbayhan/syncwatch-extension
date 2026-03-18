@@ -11,7 +11,8 @@
     let isRemoteAction = false;
     let activeMedia = null;
     let currentLang = 'en';
-    const SEEK_THRESHOLD = 2.0;
+    const SEEK_THRESHOLD = 0.5;
+    let peerIsBuffering = false; // track peer's buffering state for wait-for-slowest
 
     // Overlay elements
     let overlayEl = null;
@@ -20,10 +21,13 @@
     let overlayUrlStatus = null;
     let overlayPresence = null;
     let goToPageBtn = null;
+    let syncBtn = null;
+    let liveChatEl = null;
     let overlayVisible = false;
 
     // Dragging globals
     let isDragging = false, dragStartX = 0, dragStartY = 0, dragInitialLeft = 0, dragInitialTop = 0;
+    let dragShield = null; // transparent overlay to prevent iframes from stealing mouse events
 
     // Chat elements
     let chatPanelEl = null;
@@ -252,7 +256,7 @@
                     } catch (e) { /* ignore */ }
                 }
                 if (isTopFrame) updateDriftUI();
-            }, 1000);
+            }, 500);
         });
 
         media.addEventListener('pause', () => {
@@ -344,6 +348,11 @@
         lastSentUrl = currentUrl;
         try {
             chrome.runtime.sendMessage({ type: 'update_url', url: currentUrl });
+            // Also send page title for trending
+            const title = document.title;
+            if (title) {
+                chrome.runtime.sendMessage({ type: 'update_page_title', title: title, url: currentUrl });
+            }
         } catch (e) { /* ignore */ }
     }
 
@@ -433,26 +442,55 @@
         if (isTopFrame) updateOverlayUI();
 
         if (!activeMedia) return;
-        if (msg.action === 'buffering' || msg.action === 'timesync') return;
 
         isRemoteAction = true;
 
         switch (msg.action) {
             case 'play':
+            case 'playing':
+                // Peer resumed from buffering
+                if (peerIsBuffering) {
+                    peerIsBuffering = false;
+                }
                 if (Math.abs(activeMedia.currentTime - msg.currentTime) > SEEK_THRESHOLD) {
                     activeMedia.currentTime = msg.currentTime;
                 }
                 activeMedia.play().catch(() => {});
                 break;
+
             case 'pause':
                 activeMedia.pause();
                 if (typeof msg.currentTime === 'number') activeMedia.currentTime = msg.currentTime;
                 break;
+
             case 'seek':
                 if (typeof msg.currentTime === 'number') activeMedia.currentTime = msg.currentTime;
                 break;
+
             case 'ratechange':
                 if (typeof msg.playbackRate === 'number') activeMedia.playbackRate = msg.playbackRate;
+                break;
+
+            case 'buffering':
+                // Wait-for-slowest: pause local playback when peer is buffering
+                if (!activeMedia.paused) {
+                    peerIsBuffering = true;
+                    activeMedia.pause();
+                }
+                break;
+
+            case 'timesync':
+                // Auto-correct drift silently
+                if (typeof msg.currentTime === 'number' && !activeMedia.paused) {
+                    const elapsed = (Date.now() - (msg.timestamp || 0)) / 1000;
+                    let expectedTime = msg.currentTime;
+                    if (elapsed > 0 && elapsed < 10) expectedTime += elapsed;
+
+                    const drift = Math.abs(activeMedia.currentTime - expectedTime);
+                    if (drift > SEEK_THRESHOLD) {
+                        activeMedia.currentTime = expectedTime;
+                    }
+                }
                 break;
         }
 
@@ -538,9 +576,9 @@
     function toggleOverlay() {
         if (!overlayEl) return;
         overlayVisible = !overlayVisible;
-        overlayEl.style.display = overlayVisible ? 'block' : 'none';
+        overlayEl.style.setProperty('display', overlayVisible ? 'block' : 'none', 'important');
         if (!overlayVisible && chatPanelEl) {
-            chatPanelEl.style.display = 'none';
+            chatPanelEl.style.setProperty('display', 'none', 'important');
         }
     }
 
@@ -681,12 +719,17 @@
                 overlayEl.style.setProperty('top', dragInitialTop + 'px', 'important');
                 
                 header.style.cursor = 'grabbing';
+                overlayEl.style.setProperty('user-select', 'none', 'important');
+                
+                // Create a transparent shield to prevent iframes from stealing mouse events
+                dragShield = document.createElement('div');
+                dragShield.style.cssText = 'position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;z-index:2147483646!important;cursor:grabbing!important;background:transparent!important;pointer-events:all!important;';
+                document.body.appendChild(dragShield);
+                
                 e.preventDefault();
+                e.stopPropagation();
             };
         }
-
-        // We now handle mousemove/mouseup globally below outside createOverlay 
-        // to avoid duplicate listeners.
 
         // Get peerId from storage
         chrome.storage.local.get(['peerId'], (result) => {
@@ -702,9 +745,15 @@
         if (!isDragging || !overlayEl) return;
         const deltaX = e.clientX - dragStartX;
         const deltaY = e.clientY - dragStartY;
-        overlayEl.style.setProperty('left', (dragInitialLeft + deltaX) + 'px', 'important');
-        overlayEl.style.setProperty('top', (dragInitialTop + deltaY) + 'px', 'important');
-    });
+        const newLeft = dragInitialLeft + deltaX;
+        const newTop = dragInitialTop + deltaY;
+        
+        // Clamp to viewport
+        const maxLeft = window.innerWidth - overlayEl.offsetWidth;
+        const maxTop = window.innerHeight - overlayEl.offsetHeight;
+        overlayEl.style.setProperty('left', Math.max(0, Math.min(newLeft, maxLeft)) + 'px', 'important');
+        overlayEl.style.setProperty('top', Math.max(0, Math.min(newTop, maxTop)) + 'px', 'important');
+    }, true);
 
     document.addEventListener('mouseup', () => {
         if (isDragging) {
@@ -712,9 +761,15 @@
             if (overlayEl) {
                 const header = overlayEl.querySelector('#sw-header');
                 if (header) header.style.cursor = 'grab';
+                overlayEl.style.removeProperty('user-select');
+            }
+            // Remove the drag shield
+            if (dragShield) {
+                dragShield.remove();
+                dragShield = null;
             }
         }
-    });
+    }, true);
 
     // ─── Chat Panel ───────────────────────────────────────────
 
@@ -836,6 +891,9 @@
             }
         });
     }
+
+
+    // ─── Chat Messaging ─────────────────────────────────────────
 
     function pollChatMessages() {
         if (!currentRoomState.peerConnected) return;
@@ -961,6 +1019,8 @@
 
     function updateOverlayUI() {
         if (!overlayEl) return;
+        // Don't update UI if overlay was explicitly hidden by user
+        if (!overlayVisible) return;
 
         updatePresenceUI();
 
